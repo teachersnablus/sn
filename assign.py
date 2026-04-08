@@ -9,27 +9,57 @@ st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026", 
 
 st.markdown("""
     <style>
-    .stApp { direction: rtl; text-align: right; }
-    div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
-    input, select, textarea { direction: rtl !important; text-align: right !important; }
-    .school-title { color: #ffffff; background-color: #1E3A8A; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 25px; }
-    
-    /* تصميم صندوق البحث الجديد */
-    .search-container {
-        background-color: #f0f4f8;
-        padding: 20px;
-        border-radius: 15px;
-        border-right: 5px solid #1E3A8A;
-        margin-bottom: 25px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    /* تكبير الخط لكل النظام */
+    html, body, [class*="st-"] {
+        font-size: 18px !important;
+        direction: rtl;
+        text-align: right;
     }
-    .search-label {
-        font-size: 22px;
+    
+    .stApp { direction: rtl; text-align: right; }
+    
+    /* تنسيق النماذج */
+    div[data-testid="stForm"] { 
+        text-align: right; 
+        border: 1px solid #ddd; 
+        padding: 25px; 
+        border-radius: 12px; 
+    }
+    
+    input, select, textarea { 
+        font-size: 18px !important;
+        direction: rtl !important; 
+        text-align: right !important; 
+    }
+
+    .school-title { 
+        color: #ffffff; 
+        background-color: #1E3A8A; 
+        padding: 25px; 
+        border-radius: 10px; 
+        text-align: center; 
+        font-size: 28px !important; 
+        font-weight: bold; 
+        margin-bottom: 30px; 
+    }
+    
+    /* تنسيق سطر البحث الجديد */
+    .search-row-label {
+        font-size: 20px !important;
         font-weight: bold;
         color: #1E3A8A;
-        margin-bottom: 15px;
-        display: block;
+        white-space: nowrap;
+        padding-top: 10px;
+    }
+    
+    /* تكبير خطوط الأزرار والقوائم */
+    .stButton button {
+        font-size: 18px !important;
+        padding: 10px 20px !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-size: 20px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -37,7 +67,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v21.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v22.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -69,7 +99,7 @@ def to_excel(df):
         header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bg_color': '#D7E4BC', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(0, col_num, value, header_format)
-            worksheet.set_column(col_num, col_num, 20, cell_format)
+            worksheet.set_column(col_num, col_num, 22, cell_format)
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
                 worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], cell_format)
@@ -112,37 +142,39 @@ if not st.session_state['auth']:
 # --- 4. واجهة المدارس ---
 if st.session_state['user_type'] == "school":
     st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
-    if st.sidebar.button("تسجيل الخروج"):
-        st.session_state.clear(); st.rerun()
+    
+    # القائمة الجانبية
+    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "الالتقارير"])
 
-    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
+    # نقل زر تسجيل الخروج للأسفل في الوسط
+    st.sidebar.markdown("<br>"*15, unsafe_allow_html=True)
+    col_out1, col_out2, col_out3 = st.sidebar.columns([1, 2, 1])
+    with col_out2:
+        if st.button("🚪 خروج"):
+            st.session_state.clear()
+            st.rerun()
 
     if menu == "إضافة":
-        # تصميم البحث الجديد (توسيط وتجميل)
-        st.markdown("""
-            <div class='search-container'>
-                <span class='search-label'>🔍 بـحث برقم الهـوية</span>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # وضع حقل الإدخال في منتصف الصفحة تقريباً باستخدام أعمدة
-        col_search_1, col_search_2, col_search_3 = st.columns([1, 2, 1])
-        with col_search_2:
-            search_id = st.text_input("", placeholder="أدخل رقم الهوية المكون من 9 خانات...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
+        # تصميم سطر البحث (العنوان بجانب المستطيل)
+        col_lbl, col_inp = st.columns([1, 3])
+        with col_lbl:
+            st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية:</div>", unsafe_allow_html=True)
+        with col_inp:
+            search_id = st.text_input("", placeholder="أدخل 9 خانات للبحث أو التعديل...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
         found_row, is_main = None, False
         if search_id:
             df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ تم العثور على: {found_row['name']}")
+            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ تم العثور على الموظف: {found_row['name']}")
             else:
                 df_c = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
                 if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ تم العثور في كشف التصحيح: {found_row['name']}")
-                else: st.warning("⚠️ رقم الهوية غير مسجل مسبقاً، يمكنك البدء بالتعبئة الآن.")
+                else: st.warning("ℹ️ الرقم غير مسجل. يمكنك البدء بإدخال بيانات جديدة.")
 
         if found_row is not None:
-            if st.button("🗑️ حذف هذا السجل نهائياً"):
+            if st.button("🗑️ حذف هذا السجل"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (search_id,)); c.execute("DELETE FROM correction_table WHERE id_num=?", (search_id,))
-                conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم حذف البيانات بنجاح"); time.sleep(1); st.rerun()
+                conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم الحذف"); time.sleep(1); st.rerun()
 
         st.divider()
         t_m, t_c = st.tabs(["📝 مراقبة وتوظيف", "✍️ تصحيح"])
@@ -168,7 +200,7 @@ if st.session_state['user_type'] == "school":
                         if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة الحقول الإجبارية")
                         else:
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_ex, job, desire, note, mode))
-                            conn.commit(); st.success("✅ تم حفظ البيانات بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
 
         with t_c:
             if get_form_status('تصحيح'):
@@ -190,30 +222,29 @@ if st.session_state['user_type'] == "school":
                         if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى تعبئة الحقول الأساسية")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
-                            conn.commit(); st.success("✅ تم حفظ طلب التصحيح بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            conn.commit(); st.success("✅ تم حفظ الطلب بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
 
     elif menu == "التقارير":
-        st.subheader("📊 سجلات المدرسة الموثقة")
+        st.subheader("📊 سجلات المدرسة")
         df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
         df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
         if not df1.empty:
             st.info("🔹 كشف المراقبة والتوظيف")
             df1_view = df1.rename(columns={'id_num':'الهوية','name':'الاسم','phone':'الجوال','address':'السكن','job_title':'الوظيفة','type':'النوع'})
             st.dataframe(df1_view.drop(columns=['school_user','school_full_name']), use_container_width=True)
-            df1_excel = df1_view.drop(columns=['school_user','school_full_name']).copy()
-            df1_excel['توقيع الموظف'] = ""
-            st.download_button(label="📥 تحميل كشف المراقبة (Excel)", data=to_excel(df1_excel), file_name='monitoring.xlsx')
+            st.download_button(label="📥 تحميل كشف المراقبة (Excel)", data=to_excel(df1_view.drop(columns=['school_user','school_full_name'])), file_name='monitoring.xlsx')
         if not df2.empty:
             st.divider(); st.success("🔹 كشف التصحيح")
             df2_view = df2.rename(columns={'id_num':'الهوية','name':'الاسم','address':'السكن','subject':'المبحث', 'branch':'الفرع'})
             st.dataframe(df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']], use_container_width=True)
-            df2_excel = df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']].copy()
-            df2_excel['توقيع الموظف'] = ""
-            st.download_button(label="📥 تحميل كشف التصحيح (Excel)", data=to_excel(df2_excel), file_name='correction.xlsx')
+            st.download_button(label="📥 تحميل كشف التصحيح (Excel)", data=to_excel(df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']]), file_name='correction.xlsx')
 
+# --- 5. واجهة الإدارة ---
 elif st.session_state['user_type'] == "admin":
     st.title("🛠️ لوحة تحكم الإدارة")
-    if st.sidebar.button("خروج"): st.session_state.clear(); st.rerun()
+    st.sidebar.markdown("<br>"*15, unsafe_allow_html=True)
+    if st.sidebar.button("🚪 خروج"): st.session_state.clear(); st.rerun()
+    
     adm_menu = st.sidebar.selectbox("القائمة:", ["إدارة البيانات", "صلاحيات النماذج"])
     if adm_menu == "صلاحيات النماذج":
         cols = st.columns(3)
