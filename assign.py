@@ -54,7 +54,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v25.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v26.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -167,8 +167,10 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
-                        c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
-                        conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        else:
+                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
+                            conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
         # --- شاشة امتحان التوظيف ---
         with t_job:
@@ -187,8 +189,10 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
-                        conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        else:
+                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
+                            conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
         # --- شاشة التصحيح ---
         with t_cor:
@@ -201,15 +205,20 @@ if st.session_state['user_type'] == "school":
                     c_address = c2.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and not is_main) else "")
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
-                    sub_list = ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"]
+                    
+                    # قائمة المباحث الكاملة
+                    sub_list = ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "التربية الإسلامية", "التاريخ", "الجغرافيا", "الفيزياء", "الكيمياء", "الأحياء", "العلوم اللغوية", "الثقافة العلمية", "التكنولوجيا", "الإدارة والاقتصاد", "المحاسبة", "أخرى"]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
+                    
                     st.divider()
                     has_rel = st.radio("هل له قريب مباشر؟", ["لا يوجد", "يوجد"], horizontal=True)
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
                     st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
-                        c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
-                        conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول الأساسية")
+                        else:
+                            c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
+                            conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
     elif menu == "التقارير":
         st.subheader("📊 سجلات المدرسة الموثقة")
