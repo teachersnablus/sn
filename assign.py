@@ -27,7 +27,7 @@ st.markdown("""
 # رابط جوجل شيت (CSV)
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
-# --- 2. قاعدة البيانات المحلية ---
+# --- 2. قاعدة البيانات ---
 conn = sqlite3.connect("exams_data_2026.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS tawjihi_table 
@@ -40,9 +40,9 @@ conn.commit()
 if 'auth' not in st.session_state:
     st.session_state.update({'auth': False, 'school_display_name': "", 'user_type': ""})
 
-# --- 4. واجهة تسجيل الدخول (مدرسة / مسؤول) ---
+# --- 4. واجهة تسجيل الدخول (جنوب نابلس) ---
 if not st.session_state['auth']:
-    st.title("🏛️ بوابة مديرية التربية والتعليم - نابلس")
+    st.title("🏛️ بوابة مديرية التربية والتعليم - جنوب نابلس")
     tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
     
     with tab1:
@@ -51,11 +51,8 @@ if not st.session_state['auth']:
         
         if st.button("تسجيل الدخول للمدرسة"):
             try:
-                # قراءة البيانات مع إلغاء التخزين المؤقت لضمان جلب التعديلات الجديدة من الإكسل
                 df_acc = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
                 df_acc.columns = df_acc.columns.str.strip()
-                
-                # تنظيف البيانات للمقارنة
                 df_acc['school_user'] = df_acc['school_user'].astype(str).str.strip()
                 df_acc['password'] = df_acc['password'].astype(str).str.strip()
                 
@@ -64,32 +61,24 @@ if not st.session_state['auth']:
                 if not match.empty:
                     st.session_state['auth'] = True
                     st.session_state['user_type'] = "school"
-                    
-                    # جلب اسم المدرسة من العمود school_full_name
-                    # استخدمنا .get للمساعدة في حال وجود خطأ في اسم العمود
                     s_name = match.iloc[0].get('school_full_name', u_input)
                     st.session_state['school_display_name'] = str(s_name).strip()
-                    
-                    st.success("✅ تم التعرف على المدرسة، جاري التحويل...")
                     st.rerun()
                 else: 
                     st.error("❌ خطأ في اسم المستخدم أو كلمة المرور")
             except Exception as e: 
-                st.error(f"❌ حدث خطأ في الاتصال بالملف: {e}")
+                st.error(f"❌ حدث خطأ في الاتصال: {e}")
     
     with tab2:
-        admin_pass = st.text_input("كلمة مرور الإدارة المركزية", type="password")
+        admin_pass = st.text_input("كلمة مرور الإدارة", type="password")
         if st.button("دخول المسؤول"):
-            if admin_pass == "ADMIN2026": # يمكنك تغيير كلمة المرور هنا
+            if admin_pass == "ADMIN2026":
                 st.session_state.auth, st.session_state.user_type = True, "admin"
                 st.rerun()
-            else:
-                st.error("❌ كلمة مرور المسؤول غير صحيحة")
     st.stop()
 
-# --- 5. واجهة المدارس (نموذج الإدخال) ---
+# --- 5. واجهة المدارس ---
 if st.session_state['user_type'] == "school":
-    # الصندوق الأزرق الذي يظهر فيه اسم المدرسة
     st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
     
     if st.sidebar.button("تسجيل الخروج"):
@@ -106,9 +95,10 @@ if st.session_state['user_type'] == "school":
             id_num = st.text_input("رقم الهوية")
             phone = st.text_input("رقم الجوال")
         with col2:
-            city = st.text_input("المدينة/السكن")
-            job = st.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
+            # الترتيب الجديد المطلوب
+            city = st.text_input("المدينة")
             village = st.text_input("القرية (إن وجد)")
+            job = st.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
 
         st.divider()
         
@@ -116,7 +106,6 @@ if st.session_state['user_type'] == "school":
         with c1:
             school2 = st.text_input("اسم المدرسة الثانية (إن وجد)")
         with c2:
-            # الخانة المعدلة حسب طلبك
             rel_exam = st.text_input("امتحان القريب المباشر (اذكر الامتحان أو الامتحانات إن وجد)")
 
         st.divider()
@@ -136,23 +125,19 @@ if st.session_state['user_type'] == "school":
                 c.execute("INSERT OR REPLACE INTO tawjihi_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                           (id_num, name, st.session_state['school_display_name'], school2, phone, city, village, rel_exam, job, desire, note, mode))
                 conn.commit()
-                st.success(f"✅ تم بنجاح حفظ بيانات المعلم {name}")
+                st.success(f"✅ تم حفظ البيانات بنجاح")
             else:
-                st.error("⚠️ يرجى إدخال الحقول الإجبارية (الاسم ورقم الهوية)")
+                st.error("⚠️ يرجى تعبئة الاسم ورقم الهوية")
 
-# --- 6. لوحة المسؤول (عرض وتصدير البيانات) ---
+# --- 6. لوحة المسؤول ---
 elif st.session_state['user_type'] == "admin":
-    st.title("🛠️ لوحة الإدارة المركزية - 2026")
+    st.title("🛠️ لوحة الإدارة المركزية - جنوب نابلس")
     if st.sidebar.button("تسجيل الخروج"):
         for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
-
     df = pd.read_sql("SELECT * FROM tawjihi_table", conn)
-    st.write(f"إجمالي عدد السجلات: {len(df)}")
     st.dataframe(df, use_container_width=True)
-    
-    # تصدير الملف
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False)
-    st.download_button("📥 تحميل كافة البيانات (Excel)", data=buffer.getvalue(), file_name="General_Exams_Data_2026.xlsx")
+    st.download_button("📥 تحميل ملف Excel", data=buffer.getvalue(), file_name="Data_South_Nablus_2026.xlsx")
