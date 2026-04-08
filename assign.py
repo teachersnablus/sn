@@ -1,5 +1,5 @@
 import streamlit as st
-import pd as pd
+import pandas as pd
 import sqlite3
 from io import BytesIO
 import time
@@ -54,7 +54,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v27.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v28.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -206,7 +206,6 @@ if st.session_state['user_type'] == "school":
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
                     
-                    # القائمة الكاملة والمفصلة للمواد
                     sub_list = [
                         "", "اللغة العربية (1)", "اللغة العربية (2)", "اللغة الإنجليزية (1)", "اللغة الإنجليزية (2)",
                         "التربية الإسلامية", "الرياضيات (علمي)", "الرياضيات (أدبي/شرعي)", "الرياضيات (تجاري)",
