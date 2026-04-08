@@ -13,15 +13,31 @@ st.markdown("""
     div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
     input, select, textarea { direction: rtl !important; text-align: right !important; }
     .school-title { color: #ffffff; background-color: #1E3A8A; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 25px; }
-    .search-section { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #1E3A8A; margin-bottom: 20px; }
-    .big-search-label { font-size: 20px; font-weight: bold; color: #1E3A8A; margin-bottom: 10px; display: block; }
+    
+    /* تصميم صندوق البحث الجديد */
+    .search-container {
+        background-color: #f0f4f8;
+        padding: 20px;
+        border-radius: 15px;
+        border-right: 5px solid #1E3A8A;
+        margin-bottom: 25px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .search-label {
+        font-size: 22px;
+        font-weight: bold;
+        color: #1E3A8A;
+        margin-bottom: 15px;
+        display: block;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v20.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v21.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -99,27 +115,36 @@ if st.session_state['user_type'] == "school":
     if st.sidebar.button("تسجيل الخروج"):
         st.session_state.clear(); st.rerun()
 
-    # تعديل مسميات القائمة الجانبية
     menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
 
     if menu == "إضافة":
-        st.markdown("<div class='search-section'><span class='big-search-label'>بحث</span></div>", unsafe_allow_html=True)
-        search_id = st.text_input("", placeholder="أدخل رقم الهوية هنا...", key=f"search_{st.session_state.reset_key}").strip()
+        # تصميم البحث الجديد (توسيط وتجميل)
+        st.markdown("""
+            <div class='search-container'>
+                <span class='search-label'>🔍 بـحث برقم الهـوية</span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # وضع حقل الإدخال في منتصف الصفحة تقريباً باستخدام أعمدة
+        col_search_1, col_search_2, col_search_3 = st.columns([1, 2, 1])
+        with col_search_2:
+            search_id = st.text_input("", placeholder="أدخل رقم الهوية المكون من 9 خانات...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
         found_row, is_main = None, False
         if search_id:
             df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ الموظف: {found_row['name']}")
+            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ تم العثور على: {found_row['name']}")
             else:
                 df_c = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-                if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ الموظف في طلبات التصحيح: {found_row['name']}")
-                else: st.warning("⚠️ رقم الهوية غير مسجل مسبقاً.")
+                if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ تم العثور في كشف التصحيح: {found_row['name']}")
+                else: st.warning("⚠️ رقم الهوية غير مسجل مسبقاً، يمكنك البدء بالتعبئة الآن.")
 
         if found_row is not None:
-            if st.button("🗑️ حذف هذا السجل"):
+            if st.button("🗑️ حذف هذا السجل نهائياً"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (search_id,)); c.execute("DELETE FROM correction_table WHERE id_num=?", (search_id,))
-                conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم الحذف"); time.sleep(1); st.rerun()
+                conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم حذف البيانات بنجاح"); time.sleep(1); st.rerun()
 
+        st.divider()
         t_m, t_c = st.tabs(["📝 مراقبة وتوظيف", "✍️ تصحيح"])
         with t_m:
             if get_form_status('ثانوية') or get_form_status('توظيف'):
@@ -136,7 +161,6 @@ if st.session_state['user_type'] == "school":
                     job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (اختياري)", value=found_row['school2'] if (found_row is not None and is_main) else "")
-                    # تعديل مسمى حقل القريب في التوظيف
                     rel_ex = st.text_input("امتحان القريب المباشر (اختياري)", value=found_row['relative_exam'] if (found_row is not None and is_main) else "")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], index=0 if (found_row is None or not is_main or found_row['desire'] == "يرغب") else 1, horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], index=0 if (found_row is None or not is_main or found_row['principal_note'] == "يصلح") else 1, horizontal=True)
@@ -154,27 +178,19 @@ if st.session_state['user_type'] == "school":
                     c_name = c1.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
                     c_phone = c1.text_input("الجوال (10 خانات) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
                     c_address = c2.text_input("مكان السكن (إجباري) *", value=found_row['address'] if (found_row is not None and not is_main) else "")
-                    
-                    # استعادة حقل الفرع
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
-                    
                     sub_list = ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
-                    
                     st.divider()
-                    # استعادة حقول القريب في التصحيح
                     has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], index=0 if (found_row is None or not is_main or found_row['has_relative'] == "لا يوجد") else 1, horizontal=True)
                     rel_details = st.text_input("اسم القريب المباشر رباعياً (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
-                    rel_type_list = ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]
-                    # ملاحظة: سنخزن نوع العلاقة مؤقتاً في حقول إضافية أو ندمجها
-                    st.selectbox("علاقة القرابة", rel_type_list) 
-                    
+                    st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
                         if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى تعبئة الحقول الأساسية")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
-                            conn.commit(); st.success("✅ تم حفظ طلب التصحيح وتفريغ البيانات"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            conn.commit(); st.success("✅ تم حفظ طلب التصحيح بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
 
     elif menu == "التقارير":
         st.subheader("📊 سجلات المدرسة الموثقة")
