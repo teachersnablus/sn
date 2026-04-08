@@ -14,16 +14,16 @@ st.markdown("""
     input, select, textarea { direction: rtl !important; text-align: right !important; }
     .school-title { color: #ffffff; background-color: #1E3A8A; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 25px; }
     .search-section { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #1E3A8A; margin-bottom: 20px; }
+    .big-search-label { font-size: 20px; font-weight: bold; color: #1E3A8A; margin-bottom: 10px; display: block; }
     </style>
     """, unsafe_allow_html=True)
 
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v19.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v20.db", check_same_thread=False)
 c = conn.cursor()
 
-# الجدول الرئيسي: تم دمج المدينة والقرية في عمود واحد يسمى address
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, 
               phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, 
@@ -49,14 +49,11 @@ def to_excel(df):
         worksheet.right_to_left()
         worksheet.set_landscape()
         worksheet.fit_to_pages(1, 0)
-        
         cell_format = workbook.add_format({'font_size': 14, 'border': 1, 'align': 'center', 'valign': 'vcenter'})
         header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bg_color': '#D7E4BC', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
-        
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(0, col_num, value, header_format)
             worksheet.set_column(col_num, col_num, 20, cell_format)
-            
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
                 worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], cell_format)
@@ -73,7 +70,7 @@ def get_form_status(form_name):
     res = c.fetchone()
     return res[0] == 1 if res else True
 
-# --- 3. نظام الدخول ---
+# --- 3. تسجيل الدخول ---
 if not st.session_state['auth']:
     st.title("🏛️ بوابة مديرية التربية والتعليم - جنوب نابلس")
     tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
@@ -102,11 +99,13 @@ if st.session_state['user_type'] == "school":
     if st.sidebar.button("تسجيل الخروج"):
         st.session_state.clear(); st.rerun()
 
-    menu = st.sidebar.radio("القائمة الرئيسية:", ["تعبئة وبحث (إدارة الموظف)", "استعراض السجلات (كافة البيانات)"])
+    # تعديل مسميات القائمة الجانبية
+    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
 
-    if menu == "تعبئة وبحث (إدارة الموظف)":
-        st.markdown("<div class='search-section'>🔎 <b>إدارة الموظف:</b> ابحث برقم الهوية للتعديل أو الحذف.</div>", unsafe_allow_html=True)
-        search_id = st.text_input("أدخل رقم الهوية للبحث:", key=f"search_{st.session_state.reset_key}").strip()
+    if menu == "إضافة":
+        st.markdown("<div class='search-section'><span class='big-search-label'>بحث</span></div>", unsafe_allow_html=True)
+        search_id = st.text_input("", placeholder="أدخل رقم الهوية هنا...", key=f"search_{st.session_state.reset_key}").strip()
+        
         found_row, is_main = None, False
         if search_id:
             df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
@@ -117,7 +116,7 @@ if st.session_state['user_type'] == "school":
                 else: st.warning("⚠️ رقم الهوية غير مسجل مسبقاً.")
 
         if found_row is not None:
-            if st.button("🗑️ حذف السجل"):
+            if st.button("🗑️ حذف هذا السجل"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (search_id,)); c.execute("DELETE FROM correction_table WHERE id_num=?", (search_id,))
                 conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم الحذف"); time.sleep(1); st.rerun()
 
@@ -132,58 +131,67 @@ if st.session_state['user_type'] == "school":
                     id_num = c2.text_input("رقم الهوية (9 خانات) *", value=search_id)
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main) else "")
                     phone = c1.text_input("رقم الجوال (10 خانات) *", value=found_row['phone'] if (found_row is not None and is_main) else "")
-                    
-                    # الحقل الجديد الموحد (مكان السكن)
                     address = st.text_input("مكان السكن (إجباري) *", value=found_row['address'] if (found_row is not None and is_main) else "")
-                    
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
-                    db_job = found_row['job_title'] if (found_row is not None and is_main) else ""
-                    job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(db_job) if db_job in job_list else 0)
+                    job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (اختياري)", value=found_row['school2'] if (found_row is not None and is_main) else "")
-                    rel_ex = st.text_input("القريب المباشر (اختياري)", value=found_row['relative_exam'] if (found_row is not None and is_main) else "")
-                    des_list, note_list = ["يرغب", "لا يرغب"], ["يصلح", "لا يصلح"]
-                    desire = st.radio("الرغبة:", des_list, index=des_list.index(found_row['desire']) if (found_row is not None and is_main) else 0, horizontal=True)
-                    note = st.radio("رأي المدير:", note_list, index=note_list.index(found_row['principal_note']) if (found_row is not None and is_main) else 0, horizontal=True)
-                    
+                    # تعديل مسمى حقل القريب في التوظيف
+                    rel_ex = st.text_input("امتحان القريب المباشر (اختياري)", value=found_row['relative_exam'] if (found_row is not None and is_main) else "")
+                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], index=0 if (found_row is None or not is_main or found_row['desire'] == "يرغب") else 1, horizontal=True)
+                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], index=0 if (found_row is None or not is_main or found_row['principal_note'] == "يصلح") else 1, horizontal=True)
                     if st.form_submit_button("💾 حفظ البيانات"):
-                        if not (name and id_num and phone and address and job): 
-                            st.error("⚠️ يرجى تعبئة الحقول الإجبارية")
-                        elif len(id_num) != 9 or len(phone) != 10: 
-                            st.error("❌ تأكد من عدد خانات الهوية والجوال")
+                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة الحقول الإجبارية")
                         else:
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_ex, job, desire, note, mode))
-                            conn.commit(); st.success("✅ تم حفظ البيانات وتفريغ النموذج"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            conn.commit(); st.success("✅ تم حفظ البيانات بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+
         with t_c:
             if get_form_status('تصحيح'):
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
-                    c_id = st.text_input("رقم الهوية (9 خانات) *", value=search_id)
-                    c_name = st.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
-                    c_phone = st.text_input("الجوال (10 خانات) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
-                    c_address = st.text_input("مكان السكن (إجباري) *", value=found_row['address'] if (found_row is not None and not is_main) else "")
+                    c1, c2 = st.columns(2)
+                    c_id = c2.text_input("رقم الهوية (9 خانات) *", value=search_id)
+                    c_name = c1.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
+                    c_phone = c1.text_input("الجوال (10 خانات) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
+                    c_address = c2.text_input("مكان السكن (إجباري) *", value=found_row['address'] if (found_row is not None and not is_main) else "")
+                    
+                    # استعادة حقل الفرع
+                    branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي"]
+                    c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
+                    
                     sub_list = ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"]
-                    c_subj = st.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main) else 0)
+                    c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
+                    
+                    st.divider()
+                    # استعادة حقول القريب في التصحيح
+                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], index=0 if (found_row is None or not is_main or found_row['has_relative'] == "لا يوجد") else 1, horizontal=True)
+                    rel_details = st.text_input("اسم القريب المباشر رباعياً (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
+                    rel_type_list = ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]
+                    # ملاحظة: سنخزن نوع العلاقة مؤقتاً في حقول إضافية أو ندمجها
+                    st.selectbox("علاقة القرابة", rel_type_list) 
+                    
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj): st.error("⚠️ يرجى تعبئة كافة الحقول")
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى تعبئة الحقول الأساسية")
                         else:
-                            c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", c_address, "", "", c_phone))
-                            conn.commit(); st.success("✅ تم الحفظ وتفريغ البيانات"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
+                            conn.commit(); st.success("✅ تم حفظ طلب التصحيح وتفريغ البيانات"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
 
-    elif menu == "استعراض السجلات (كافة البيانات)":
-        st.subheader("📊 بيانات موظفي المدرسة")
+    elif menu == "التقارير":
+        st.subheader("📊 سجلات المدرسة الموثقة")
         df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
         df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
         if not df1.empty:
+            st.info("🔹 كشف المراقبة والتوظيف")
             df1_view = df1.rename(columns={'id_num':'الهوية','name':'الاسم','phone':'الجوال','address':'السكن','job_title':'الوظيفة','type':'النوع'})
             st.dataframe(df1_view.drop(columns=['school_user','school_full_name']), use_container_width=True)
             df1_excel = df1_view.drop(columns=['school_user','school_full_name']).copy()
             df1_excel['توقيع الموظف'] = ""
             st.download_button(label="📥 تحميل كشف المراقبة (Excel)", data=to_excel(df1_excel), file_name='monitoring.xlsx')
         if not df2.empty:
-            st.divider()
-            df2_view = df2.rename(columns={'id_num':'الهوية','name':'الاسم','address':'السكن','subject':'المبحث'})
-            st.dataframe(df2_view[['الهوية','الاسم','السكن','المبحث']], use_container_width=True)
-            df2_excel = df2_view[['الهوية','الاسم','السكن','المبحث']].copy()
+            st.divider(); st.success("🔹 كشف التصحيح")
+            df2_view = df2.rename(columns={'id_num':'الهوية','name':'الاسم','address':'السكن','subject':'المبحث', 'branch':'الفرع'})
+            st.dataframe(df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']], use_container_width=True)
+            df2_excel = df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']].copy()
             df2_excel['توقيع الموظف'] = ""
             st.download_button(label="📥 تحميل كشف التصحيح (Excel)", data=to_excel(df2_excel), file_name='correction.xlsx')
 
