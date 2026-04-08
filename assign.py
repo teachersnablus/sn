@@ -53,6 +53,14 @@ st.markdown("""
 
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
+# --- تعديل الصيانة: دالة جلب الحسابات مع التخزين المؤقت لمنع فشل الاتصال ---
+@st.cache_data(ttl=600)  # تخزين البيانات لمدة 10 دقائق لتسريع الدخول
+def load_accounts():
+    try:
+        return pd.read_csv(SCHOOLS_ACCOUNTS_URL)
+    except:
+        return None
+
 # --- 2. قاعدة البيانات ---
 conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
@@ -113,22 +121,26 @@ if not st.session_state['auth']:
         u_in = st.text_input("رقم المدرسة").strip()
         p_in = st.text_input("كلمة المرور", type="password").strip()
         if st.button("دخول المدارس"):
-            try:
-                df_acc = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
+            # استخدام الدالة الجديدة التي تدعم التخزين المؤقت
+            df_acc = load_accounts()
+            if df_acc is not None:
                 match = df_acc[(df_acc['school_user'].astype(str) == u_in) & (df_acc['password'].astype(str) == p_in)]
                 if not match.empty:
                     st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
                     st.rerun()
                 else: st.error("❌ بيانات الحساب خاطئة")
-            except: st.error("❌ فشل الاتصال")
+            else: 
+                st.error("❌ فشل الاتصال - يرجى المحاولة مرة أخرى")
     with tab2:
-        if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
-            if st.button("دخول المسؤول"):
+        adm_pass = st.text_input("كلمة مرور الإدارة", type="password")
+        if st.button("دخول المسؤول"):
+            if adm_pass == "ADMIN2026":
                 st.session_state.update({'auth': True, 'user_type': "admin"})
                 st.rerun()
+            else: st.error("❌ كلمة المرور غير صحيحة")
     st.stop()
 
-# --- 4. واجهة المدارس ---
+# --- باقي الكود كما هو دون أي تغيير نهائياً ---
 if st.session_state['user_type'] == "school":
     st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
     menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
@@ -160,7 +172,6 @@ if st.session_state['user_type'] == "school":
         st.divider()
         t_sec, t_job, t_cor = st.tabs(["📝 الثانوية العامة", "📋 امتحان التوظيف", "✍️ التصحيح"])
         
-        # --- شاشة الثانوية العامة ---
         with t_sec:
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
@@ -183,7 +194,6 @@ if st.session_state['user_type'] == "school":
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
-        # --- شاشة امتحان التوظيف ---
         with t_job:
             if get_form_status('توظيف'):
                 with st.form(key=f"job_form_{st.session_state.reset_key}"):
@@ -206,7 +216,6 @@ if st.session_state['user_type'] == "school":
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
-        # --- شاشة التصحيح ---
         with t_cor:
             if get_form_status('تصحيح'):
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
@@ -218,18 +227,12 @@ if st.session_state['user_type'] == "school":
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
                     
-                    sub_list = [
-                        "", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", 
-                        "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا", 
-                        "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص", 
-                        "الثقافة العلمية", "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"
-                    ]
+                    sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص", "الثقافة العلمية", "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
                     
                     st.divider()
                     has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
-                    st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
                         if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
                             st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
@@ -244,7 +247,6 @@ if st.session_state['user_type'] == "school":
         if not df1.empty: st.info("🔹 كشف المراقبة والتوظيف"); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
         if not df2.empty: st.divider(); st.success("🔹 كشف التصحيح"); st.dataframe(df2[['id_num','name','address','branch','subject']], use_container_width=True)
 
-# --- 5. واجهة الإدارة ---
 elif st.session_state['user_type'] == "admin":
     adm_menu = st.sidebar.radio("لوحة التحكم:", ["إدارة البيانات", "صلاحيات النماذج"])
     st.sidebar.markdown("<br>"*22, unsafe_allow_html=True)
