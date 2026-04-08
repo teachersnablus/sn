@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pd as pd
 import sqlite3
 from io import BytesIO
 import time
@@ -54,7 +54,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v26.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v27.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -203,19 +203,25 @@ if st.session_state['user_type'] == "school":
                     c_name = c1.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
                     c_phone = c1.text_input("الجوال *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
                     c_address = c2.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and not is_main) else "")
-                    branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي"]
+                    branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
                     
-                    # قائمة المباحث الكاملة
-                    sub_list = ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "التربية الإسلامية", "التاريخ", "الجغرافيا", "الفيزياء", "الكيمياء", "الأحياء", "العلوم اللغوية", "الثقافة العلمية", "التكنولوجيا", "الإدارة والاقتصاد", "المحاسبة", "أخرى"]
+                    # القائمة الكاملة والمفصلة للمواد
+                    sub_list = [
+                        "", "اللغة العربية (1)", "اللغة العربية (2)", "اللغة الإنجليزية (1)", "اللغة الإنجليزية (2)",
+                        "التربية الإسلامية", "الرياضيات (علمي)", "الرياضيات (أدبي/شرعي)", "الرياضيات (تجاري)",
+                        "الفيزياء", "الكيمياء", "الأحياء", "العلوم الحياتية", "العلوم اللغوية", "تاريخ العالم والحديث",
+                        "الجغرافيا", "الثقافة العلمية", "الإدارة والاقتصاد", "المحاسبة", "التكنولوجيا", "التربية الدينية المسيحية",
+                        "العلوم المهنية", "الرسم المهني", "الفرنيسي", "البرمجة", "العلوم الإنسانية"
+                    ]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
                     
                     st.divider()
-                    has_rel = st.radio("هل له قريب مباشر؟", ["لا يوجد", "يوجد"], horizontal=True)
+                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
                     st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول الأساسية")
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
