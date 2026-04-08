@@ -3,7 +3,7 @@ import pandas as pd
 import sqlite3
 
 # --- 1. إعدادات الصفحة والتنسيق ---
-st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026", layout="wide")
+st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026 - الإدارة", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,6 +11,7 @@ st.markdown("""
     div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
     input, select, textarea { direction: rtl !important; text-align: right !important; }
     .school-title { color: #ffffff; background-color: #1E3A8A; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 25px; }
+    .admin-header { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-right: 5px solid #1E3A8A; margin-bottom: 20px; }
     .search-section { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #1E3A8A; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
@@ -81,7 +82,6 @@ if st.session_state['user_type'] == "school":
         st.markdown("<div class='search-section'>🔎 <b>بحث سريع برقم الهوية:</b> أدخل الرقم لجلب البيانات وتعديلها تلقائياً.</div>", unsafe_allow_html=True)
         search_id = st.text_input("رقم الهوية للبحث:")
         
-        # جلب البيانات كـ DataFrame للتعامل مع الأسماء
         found_row = None
         is_in_main = False
         
@@ -113,8 +113,7 @@ if st.session_state['user_type'] == "school":
                     school2 = st.text_input("المدرسة الثانية", value=found_row['school2'] if (found_row is not None and is_in_main) else "")
                     rel_ex = st.text_input("قريب مباشر في الامتحان", value=found_row['relative_exam'] if (found_row is not None and is_in_main) else "")
                     if st.form_submit_button("💾 حفظ وإفراغ الخانات"):
-                        if not id_num.strip():
-                            st.error("⚠️ رقم الهوية مطلوب!")
+                        if not id_num.strip(): st.error("⚠️ رقم الهوية مطلوب!")
                         else:
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, city, village, rel_ex, job, "", "", mode))
@@ -129,8 +128,7 @@ if st.session_state['user_type'] == "school":
                     c_subj = st.selectbox("المبحث", ["اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"])
                     c_phone = st.text_input("الجوال ", value=found_row['phone'] if (found_row is not None and not is_in_main) else "")
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
-                        if not c_id.strip():
-                            st.error("⚠️ رقم الهوية مطلوب!")
+                        if not c_id.strip(): st.error("⚠️ رقم الهوية مطلوب!")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                       (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", "", "", "", "", c_phone))
@@ -150,18 +148,16 @@ if st.session_state['user_type'] == "school":
         if target:
             is_m = target in df1['id_num'].values
             row = df1[df1['id_num']==target].iloc[0] if is_m else df2[df2['id_num']==target].iloc[0]
-            
             with st.expander(f"🛠️ تعديل شامل: {row['name']}"):
-                un = st.text_input("الاسم", value=row['name'], key="edit_name")
-                up = st.text_input("الجوال", value=row['phone'], key="edit_phone")
-                uc = st.text_input("المدينة", value=row['city'], key="edit_city")
-                uv = st.text_input("القرية", value=row['village'], key="edit_village")
-                if st.button("💾 حفظ التعديلات"):
-                    if is_m: c.execute("UPDATE main_table SET name=?, phone=?, city=?, village=? WHERE id_num=?", (un, up, uc, uv, target))
-                    else: c.execute("UPDATE correction_table SET name=?, phone=?, city=?, village=? WHERE id_num=?", (un, up, uc, uv, target))
+                un = st.text_input("الاسم", value=row['name'], key="sch_edit_n")
+                up = st.text_input("الجوال", value=row['phone'], key="sch_edit_p")
+                uc = st.text_input("المدينة", value=row['city'], key="sch_edit_c")
+                uv = st.text_input("القرية", value=row['village'], key="sch_edit_v")
+                if st.button("💾 حفظ التعديلات", key="sch_save_btn"):
+                    tbl = "main_table" if is_m else "correction_table"
+                    c.execute(f"UPDATE {tbl} SET name=?, phone=?, city=?, village=? WHERE id_num=?", (un, up, uc, uv, target))
                     conn.commit(); st.success("تم التحديث"); st.rerun()
-            
-            if st.button("🗑️ حذف هذا السجل نهائياً"):
+            if st.button("🗑️ حذف السجل", key="sch_del_btn"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (target,))
                 c.execute("DELETE FROM correction_table WHERE id_num=?", (target,))
                 conn.commit(); st.rerun()
@@ -179,22 +175,43 @@ elif st.session_state['user_type'] == "admin":
             with cols[i]:
                 curr = get_form_status(f)
                 st.write(f"نموذج {f} - الحالة: {'✅ مفتوح' if curr else '❌ مغلق'}")
-                if st.button(f"تغيير الحالة لـ {f}", key=f"admin_toggle_{f}"):
+                if st.button(f"تغيير الحالة لـ {f}", key=f"adm_toggle_{f}"):
                     c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f))
                     conn.commit(); st.rerun()
     else:
         tab1, tab2, tab3 = st.tabs(["المراقبة", "التوظيف", "التصحيح"])
-        def view_data(t_name, d_type, k_s, is_c=False):
+        
+        def admin_view_and_edit(t_name, d_type, k_s, is_c=False):
             df = pd.read_sql("SELECT * FROM correction_table", conn) if is_c else pd.read_sql(f"SELECT * FROM main_table WHERE type='{d_type}'", conn)
             schools = ["الكل"] + sorted(df['school_full_name'].unique().tolist())
-            sel = st.selectbox(f"تصفية مدرسة ({t_name}):", schools, key=f"adm_sel_{k_s}")
+            sel = st.selectbox(f"فلترة حسب مدرسة ({t_name}):", schools, key=f"adm_sel_{k_s}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             st.dataframe(f_df)
-            t_del = st.selectbox(f"حذف هوية ({t_name}):", [""] + f_df['id_num'].tolist(), key=f"adm_del_{k_s}")
-            if st.button(f"تأكيد حذف {t_del}", key=f"adm_btn_{k_s}"):
-                if t_del:
-                    c.execute(f"DELETE FROM {'correction_table' if is_c else 'main_table'} WHERE id_num=?", (t_del,))
-                    conn.commit(); st.success("تم الحذف"); st.rerun()
-        with tab1: view_data("ثانوية عامة", "الثانوية العامة", "tw")
-        with tab2: view_data("توظيف", "امتحان التوظيف", "em")
-        with tab3: view_data("تصحيح", "", "cr", True)
+            
+            st.write("---")
+            target_id = st.selectbox(f"اختر موظف من ({t_name}) للإجراء:", [""] + f_df['id_num'].tolist(), key=f"adm_select_{k_s}")
+            
+            if target_id:
+                row_data = f_df[f_df['id_num'] == target_id].iloc[0]
+                col_e, col_d = st.columns(2)
+                
+                with col_e:
+                    with st.expander(f"📝 تعديل بيانات: {row_data['name']}"):
+                        adm_un = st.text_input("الاسم", value=row_data['name'], key=f"adm_un_{k_s}_{target_id}")
+                        adm_up = st.text_input("الجوال", value=row_data['phone'], key=f"adm_up_{k_s}_{target_id}")
+                        adm_uc = st.text_input("المدينة", value=row_data['city'], key=f"adm_uc_{k_s}_{target_id}")
+                        adm_uv = st.text_input("القرية", value=row_data['village'], key=f"adm_uv_{k_s}_{target_id}")
+                        if st.button("💾 حفظ التعديلات الإدارية", key=f"adm_save_{k_s}_{target_id}"):
+                            tbl_name = "correction_table" if is_c else "main_table"
+                            c.execute(f"UPDATE {tbl_name} SET name=?, phone=?, city=?, village=? WHERE id_num=?", (adm_un, adm_up, adm_uc, adm_uv, target_id))
+                            conn.commit(); st.success("تم تحديث البيانات بنجاح"); st.rerun()
+                
+                with col_d:
+                    if st.button(f"🗑️ حذف السجل {target_id}", key=f"adm_del_{k_s}_{target_id}"):
+                        tbl_name = "correction_table" if is_c else "main_table"
+                        c.execute(f"DELETE FROM {tbl_name} WHERE id_num=?", (target_id,))
+                        conn.commit(); st.success("تم الحذف"); st.rerun()
+
+        with tab1: admin_view_and_edit("ثانوية عامة", "الثانوية العامة", "tw")
+        with tab2: admin_view_and_edit("توظيف", "امتحان التوظيف", "em")
+        with tab3: admin_view_and_edit("تصحيح", "", "cr", True)
