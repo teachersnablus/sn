@@ -54,7 +54,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v28.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -94,6 +94,16 @@ def get_form_status(form_name):
     c.execute("SELECT is_open FROM system_settings WHERE form_name=?", (form_name,))
     res = c.fetchone()
     return res[0] == 1 if res else True
+
+# --- دالة التحقق من الأرقام ---
+def validate_inputs(id_val, phone_val):
+    if len(id_val) != 9 or not id_val.isdigit():
+        st.error("❌ خطأ: رقم الهوية يجب أن يتكون من 9 أرقام بالضبط.")
+        return False
+    if len(phone_val) != 10 or not phone_val.isdigit():
+        st.error("❌ خطأ: رقم الجوال يجب أن يتكون من 10 أرقام بالضبط.")
+        return False
+    return True
 
 # --- 3. تسجيل الدخول ---
 if not st.session_state['auth']:
@@ -155,9 +165,9 @@ if st.session_state['user_type'] == "school":
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية *", value=search_id)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
-                    phone = c1.text_input("رقم الجوال *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
                     address = st.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
                     job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
@@ -167,8 +177,9 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
-                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
-                        else:
+                        if not (name and id_num and phone and address and job): 
+                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        elif validate_inputs(id_num, phone):
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
@@ -177,9 +188,9 @@ if st.session_state['user_type'] == "school":
             if get_form_status('توظيف'):
                 with st.form(key=f"job_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية *", value=search_id)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
-                    phone = c1.text_input("رقم الجوال *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
                     address = st.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
                     job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
@@ -189,8 +200,9 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
-                        else:
+                        if not (name and id_num and phone and address and job): 
+                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        elif validate_inputs(id_num, phone):
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
@@ -199,30 +211,18 @@ if st.session_state['user_type'] == "school":
             if get_form_status('تصحيح'):
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    c_id = c2.text_input("رقم الهوية *", value=search_id)
+                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
                     c_name = c1.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
-                    c_phone = c1.text_input("الجوال *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
+                    c_phone = c1.text_input("الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
                     c_address = c2.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and not is_main) else "")
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
                     
                     sub_list = [
-                        "", 
-                        "اللغة العربية", 
-                        "اللغة الإنجليزية", 
-                        "الرياضيات", 
-                        "التربية الإسلامية", 
-                        "الفيزياء", 
-                        "الكيمياء", 
-                        "الأحياء", 
-                        "تكنولوجيا المعلومات", 
-                        "التاريخ", 
-                        "الجغرافيا", 
-                        "فرع (الريادة و الأعمال) - مباحث التخصص", 
-                        "فرع (الاقتصاد المنزلي) - مباحث التخصص", 
-                        "الثقافة العلمية", 
-                        "الفروع المهنية (الصناعي ) - مباحث التخصص", 
-                        "الفروع المهنية (الزراعي) - مباحث التخصص",
+                        "", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", 
+                        "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا", 
+                        "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص", 
+                        "الثقافة العلمية", "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"
                     ]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
                     
@@ -231,8 +231,9 @@ if st.session_state['user_type'] == "school":
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
                     st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
-                        else:
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
+                            st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                        elif validate_inputs(c_id, c_phone):
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
