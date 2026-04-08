@@ -23,7 +23,7 @@ conn = sqlite3.connect("exams_data_2026.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS tawjihi_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_name TEXT, school2 TEXT, phone TEXT, 
-              city TEXT, village TEXT, relative_name TEXT, job_title TEXT, 
+              city TEXT, village TEXT, relative_exam TEXT, job_title TEXT, 
               desire TEXT, principal_note TEXT, type TEXT)''')
 conn.commit()
 
@@ -41,42 +41,47 @@ if not st.session_state['auth']:
         p_input = st.text_input("كلمة المرور", type="password").strip()
         if st.button("تسجيل الدخول"):
             try:
+                # جلب البيانات وتنظيف أسماء الأعمدة من أي مسافات زائدة
                 df_acc = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
                 df_acc.columns = df_acc.columns.str.strip()
+                
+                # البحث عن الحساب المطابق
                 match = df_acc[(df_acc['school_user'].astype(str) == u_input) & (df_acc['password'].astype(str) == p_input)]
                 
                 if not match.empty:
                     st.session_state['auth'] = True
                     st.session_state['user_type'] = "school"
                     
-                    # محاولة جلب الاسم من أي عمود محتمل (لتجنب الخطأ)
-                    potential_cols = ['school_full_name', 'اسم المدرسة', 'school_name', 'full_name']
-                    found_name = u_input
-                    for col in potential_cols:
-                        if col in df_acc.columns:
-                            found_name = match.iloc[0][col]
-                            break
-                    st.session_state['school_display_name'] = found_name
+                    # جلب اسم المدرسة من عمود school_full_name حصراً
+                    if 'school_full_name' in df_acc.columns:
+                        school_val = match.iloc[0]['school_full_name']
+                        st.session_state['school_display_name'] = str(school_val)
+                    else:
+                        st.session_state['school_display_name'] = u_input
+                    
                     st.rerun()
-                else: st.error("❌ بيانات الدخول غير صحيحة")
-            except Exception as e: st.error(f"❌ خطأ: {e}")
+                else: 
+                    st.error("❌ بيانات الدخول غير صحيحة")
+            except Exception as e: 
+                st.error(f"❌ خطأ في قراءة ملف الإكسل: {e}")
     
     with tab2:
-        if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
-            if st.button("دخول الإدارة"):
+        adm_pass = st.text_input("كلمة مرور الإدارة", type="password")
+        if st.button("دخول الإدارة"):
+            if adm_pass == "ADMIN2026":
                 st.session_state.auth, st.session_state.user_type = True, "admin"
                 st.rerun()
     st.stop()
 
 # --- 5. واجهة المدارس ---
 if st.session_state['user_type'] == "school":
+    # عرض اسم المدرسة الذي تم جلبه
     st.markdown(f"<h2 class='school-title'>📝 نموذج مدرسة: {st.session_state['school_display_name']}</h2>", unsafe_allow_html=True)
     
     if st.sidebar.button("تسجيل الخروج"):
         st.session_state.auth = False
         st.rerun()
 
-    # استرجاع خيار نوع النموذج (الذي طلبته)
     mode = st.radio("اختر نوع النموذج:", ["الثانوية العامة", "امتحان التوظيف"], horizontal=True)
     st.divider()
 
@@ -93,12 +98,12 @@ if st.session_state['user_type'] == "school":
 
         st.divider()
         
-        # حقول إضافية داخل الصندوق
         c1, c2 = st.columns(2)
         with c1:
             school2 = st.text_input("اسم المدرسة الثانية (إن وجد)")
         with c2:
-            rel_name = st.text_input("اسم القريب المباشر في الامتحان (إن وجد)")
+            # التعديل المطلوب: امتحان القريب المباشر
+            rel_exam = st.text_input("امتحان القريب المباشر (إن وجد - اذكر أكثر من امتحان إن وجد)")
 
         st.divider()
         
@@ -115,10 +120,10 @@ if st.session_state['user_type'] == "school":
         if st.form_submit_button("💾 حفظ وإرسال البيانات"):
             if name and id_num:
                 c.execute("INSERT OR REPLACE INTO tawjihi_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                          (id_num, name, st.session_state['school_display_name'], school2, phone, city, village, rel_name, job, desire, note, mode))
+                          (id_num, name, st.session_state['school_display_name'], school2, phone, city, village, rel_exam, job, desire, note, mode))
                 conn.commit()
                 st.success(f"✅ تم حفظ بيانات {name} بنجاح")
-            else: st.error("⚠️ يرجى تعبئة الحقول الأساسية")
+            else: st.error("⚠️ يرجى تعبئة الحقول الأساسية (الاسم ورقم الهوية)")
 
 # --- 6. لوحة الإدارة ---
 elif st.session_state['user_type'] == "admin":
