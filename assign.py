@@ -3,10 +3,31 @@ import pandas as pd
 import sqlite3
 import io
 
-# --- 1. إعدادات الصفحة والروابط ---
+# --- 1. إعدادات الصفحة والتنسيق من اليمين لليسار (RTL) ---
 st.set_page_config(page_title="نظام جمع البيانات 2026", layout="wide")
 
-# الرابط المباشر الذي قدمته (تم التحقق منه)
+# إضافة تنسيق CSS لجعل الواجهة تدعم اللغة العربية بالكامل
+st.markdown("""
+    <style>
+    .stApp {
+        direction: rtl;
+        text-align: right;
+    }
+    div[data-testid="stForm"] {
+        text-align: right;
+    }
+    .st-emotion-cache-1kyxreq {
+        justify-content: flex-end;
+    }
+    /* محاذاة القوائم المنسدلة والنصوص */
+    input, select, textarea {
+        direction: rtl !format;
+        text-align: right !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# رابط جوجل شيت (CSV) الخاص بك
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. إعداد قاعدة البيانات المحلية ---
@@ -23,25 +44,22 @@ c.execute('''CREATE TABLE IF NOT EXISTS hiring_table
               job_title TEXT, relative_exams TEXT)''')
 conn.commit()
 
-# --- 3. دالة جلب البيانات مع معالجة الأخطاء ---
-@st.cache_data(ttl=600)  # تحديث البيانات كل 10 دقائق
+# --- 3. دالة جلب حسابات المدارس ---
+@st.cache_data(ttl=600)
 def fetch_accounts(url):
     try:
-        # قراءة البيانات مع تحديد الترميز لضمان دعم اللغة العربية
         df = pd.read_csv(url)
-        # إزالة أي مسافات زائدة في أسماء الأعمدة أو القيم
         df.columns = df.columns.str.strip()
         return df
-    except Exception as e:
+    except:
         return None
 
-# --- 4. إدارة الجلسة ---
+# --- 4. إدارة الجلسة (Login System) ---
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
     st.session_state['user_type'] = ""
     st.session_state['school_id'] = ""
 
-# --- 5. شاشة تسجيل الدخول ---
 if not st.session_state['auth']:
     st.title("🏛️ بوابة مديرية التربية والتعليم - نابلس")
     
@@ -50,10 +68,9 @@ if not st.session_state['auth']:
     with tab1:
         u_input = st.text_input("اسم المستخدم (المدرسة)").strip()
         p_input = st.text_input("كلمة المرور", type="password").strip()
-        if st.button("دخول"):
+        if st.button("تسجيل الدخول"):
             df_acc = fetch_accounts(SCHOOLS_ACCOUNTS_URL)
             if df_acc is not None:
-                # التحقق من وجود الحساب (تحويل القيم لنصوص للمقارنة الدقيقة)
                 match = df_acc[(df_acc['school_user'].astype(str).str.strip() == u_input) & 
                                (df_acc['password'].astype(str).str.strip() == p_input)]
                 if not match.empty:
@@ -61,33 +78,32 @@ if not st.session_state['auth']:
                     st.session_state['user_type'] = "school"
                     st.session_state['school_id'] = u_input
                     st.rerun()
-                else:
-                    st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
-            else:
-                st.error("❌ فشل جلب البيانات من Google Sheets. تأكد من إعدادات النشر.")
+                else: st.error("❌ بيانات الدخول غير صحيحة")
+            else: st.error("❌ فشل الاتصال بقاعدة بيانات المدارس")
 
     with tab2:
-        admin_pass = st.text_input("كلمة مرور الإدارة", type="password")
+        admin_pass = st.text_input("كلمة مرور الإدارة المركزية", type="password")
         if st.button("دخول الإدارة"):
-            if admin_pass == "ADMIN2026": # يمكنك تغييرها
+            if admin_pass == "ADMIN2026":
                 st.session_state['auth'] = True
                 st.session_state['user_type'] = "admin"
                 st.rerun()
             else: st.error("❌ كلمة المرور خطأ")
     st.stop()
 
-# --- 6. واجهة المدارس ---
+# --- 5. واجهة المدارس (RTL) ---
 if st.session_state.user_type == "school":
     st.sidebar.success(f"المدرسة: {st.session_state.school_id}")
     if st.sidebar.button("خروج"):
         st.session_state.auth = False
         st.rerun()
 
-    mode = st.radio("نوع النموذج:", ["الثانوية العامة", "امتحان التوظيف"], horizontal=True)
-    
+    mode = st.radio("اختر نوع النموذج:", ["الثانوية العامة", "امتحان التوظيف"], horizontal=True)
+    st.divider()
+
     if mode == "الثانوية العامة":
-        with st.form("t_form"):
-            st.subheader("📝 بيانات الثانوية العامة")
+        st.subheader("📝 بيانات المعلم - الثانوية العامة")
+        with st.form("t_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
                 name = st.text_input("اسم المعلم رباعي")
@@ -97,48 +113,66 @@ if st.session_state.user_type == "school":
             with c2:
                 village = st.text_input("القرية / السكن")
                 job = st.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
-                sec_sch = st.checkbox("يعمل في مدرسة ثانية؟")
-                school2 = st.text_input("اسم المدرسة الثانية") if sec_sch else ""
+                
+                # --- ميزة التفاعل: المدرسة الثانية ---
+                sec_sch_check = st.checkbox("يعمل في مدرسة ثانية؟")
+                school2 = ""
+                if sec_sch_check:
+                    school2 = st.text_input("اسم المدرسة الثانية")
             
             st.divider()
-            rel = st.radio("قريب مباشر في الامتحان؟", ["لا يوجد", "يوجد"])
-            rel_n = st.text_input("اسم القريب") if rel == "يوجد" else ""
-            desire = st.radio("يرغب بالمراقبة؟", ["يرغب", "لا يرغب"])
-            note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"])
             
-            if st.form_submit_button("حفظ"):
+            # --- ميزة التفاعل: القريب المباشر ---
+            rel_check = st.radio("هل له قريب مباشر في الامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
+            rel_n = ""
+            if rel_check == "يوجد":
+                rel_n = st.text_input("اسم القريب المباشر")
+            
+            st.divider()
+            desire = st.radio("يرغب بالمراقبة؟", ["يرغب", "لا يرغب"], horizontal=True)
+            note = st.radio("رأي المدير (هل يصلح للعمل؟):", ["يصلح", "لا يصلح"], horizontal=True)
+            
+            if st.form_submit_button("حفظ وإرسال البيانات"):
                 if name and id_num:
                     c.execute("INSERT OR REPLACE INTO tawjihi_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                               (id_num, name, st.session_state.school_id, school2, phone, city, village, rel_n, job, desire, note))
                     conn.commit()
-                    st.success("تم الحفظ!")
+                    st.success(f"✅ تم حفظ بيانات {name} بنجاح")
+                else: st.error("⚠️ يرجى إكمال البيانات الأساسية")
+
     else:
-        with st.form("h_form"):
-            st.subheader("📋 بيانات التوظيف")
+        st.subheader("📋 بيانات المعلم - امتحان التوظيف")
+        with st.form("h_form", clear_on_submit=True):
             h_name = st.text_input("الاسم رباعي")
             h_id = st.text_input("رقم الهوية")
             h_job = st.selectbox("الوظيفة الحالية", ["معلم", "مدير", "سكرتير", "آذن"])
-            h_rel = st.radio("قريب متقدم للتوظيف؟", ["لا يوجد", "يوجد"])
-            h_exams = st.text_area("أسماء الاختبارات") if h_rel == "يوجد" else ""
-            if st.form_submit_button("حفظ التوظيف"):
-                c.execute("INSERT OR REPLACE INTO hiring_table VALUES (?,?,?,?,?,?)",
-                          (h_id, h_name, st.session_state.school_id, "", h_job, h_exams))
-                conn.commit()
-                st.success("تم الحفظ!")
+            
+            # --- ميزة التفاعل في التوظيف ---
+            h_rel = st.radio("هل له قريب متقدم لاختبار التوظيف؟", ["لا يوجد", "يوجد"], horizontal=True)
+            h_exams = ""
+            if h_rel == "يوجد":
+                h_exams = st.text_area("اكتب أسماء الاختبارات (كل اختبار في سطر)")
+            
+            if st.form_submit_button("حفظ بيانات التوظيف"):
+                if h_name and h_id:
+                    c.execute("INSERT OR REPLACE INTO hiring_table VALUES (?,?,?,?,?,?)",
+                              (h_id, h_name, st.session_state.school_id, "", h_job, h_exams))
+                    conn.commit()
+                    st.success(f"✅ تم الحفظ بنجاح")
 
-# --- 7. لوحة التحكم (المدير) ---
+# --- 6. واجهة المدير (تصدير البيانات) ---
 elif st.session_state.user_type == "admin":
-    st.title("🛠️ لوحة الإدارة")
+    st.title("🛠️ لوحة تحكم الإدارة")
     if st.sidebar.button("خروج"):
         st.session_state.auth = False
         st.rerun()
 
     d1 = pd.read_sql("SELECT * FROM tawjihi_table", conn)
-    st.write("بيانات الثانوية العامة")
-    st.dataframe(d1)
+    st.write("### بيانات الثانوية العامة المسجلة")
+    st.dataframe(d1, use_container_width=True)
     
-    # تصدير إكسل
+    # تحميل إكسل
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        d1.to_excel(writer, index=False)
-    st.download_button("📥 تحميل Excel", data=buffer.getvalue(), file_name="Data_2026.xlsx")
+        d1.to_excel(writer, index=False, sheet_name='البيانات')
+    st.download_button("📥 تحميل كافة البيانات (Excel)", data=buffer.getvalue(), file_name="General_Exams_2026.xlsx")
