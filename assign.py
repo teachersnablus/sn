@@ -9,16 +9,15 @@ st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026", 
 
 st.markdown("""
     <style>
-    /* تكبير الخط لكل النظام */
+    /* تكبير الخط العام */
     html, body, [class*="st-"] {
-        font-size: 18px !important;
+        font-size: 19px !important;
         direction: rtl;
         text-align: right;
     }
     
     .stApp { direction: rtl; text-align: right; }
     
-    /* تنسيق النماذج */
     div[data-testid="stForm"] { 
         text-align: right; 
         border: 1px solid #ddd; 
@@ -27,7 +26,7 @@ st.markdown("""
     }
     
     input, select, textarea { 
-        font-size: 18px !important;
+        font-size: 19px !important;
         direction: rtl !important; 
         text-align: right !important; 
     }
@@ -43,23 +42,30 @@ st.markdown("""
         margin-bottom: 30px; 
     }
     
-    /* تنسيق سطر البحث الجديد */
+    /* تنسيق سطر البحث المحدث (اللون الأبيض) */
     .search-row-label {
-        font-size: 20px !important;
+        font-size: 22px !important;
         font-weight: bold;
-        color: #1E3A8A;
+        color: #ffffff; /* تغيير اللون للأبيض */
+        background-color: #1E3A8A; /* خلفية لضمان وضوح النص الأبيض */
+        padding: 10px 15px;
+        border-radius: 8px;
         white-space: nowrap;
-        padding-top: 10px;
+        text-align: center;
     }
     
     /* تكبير خطوط الأزرار والقوائم */
     .stButton button {
-        font-size: 18px !important;
-        padding: 10px 20px !important;
+        font-size: 19px !important;
     }
     
     .stTabs [data-baseweb="tab"] {
-        font-size: 20px !important;
+        font-size: 21px !important;
+    }
+
+    /* دفع زر الخروج لأسفل القائمة الجانبية */
+    [data-testid="stSidebarNav"] {
+        max-height: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -67,7 +73,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v22.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v23.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -85,7 +91,7 @@ for form in ['ثانوية', 'توظيف', 'تصحيح']:
     c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
 
-# --- دالة تصدير الإكسل المنسق ---
+# --- دالة تصدير الإكسل ---
 def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -131,7 +137,7 @@ if not st.session_state['auth']:
                     st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
                     st.rerun()
                 else: st.error("❌ بيانات الحساب خاطئة")
-            except: st.error("❌ فشل الاتصال بالحسابات")
+            except: st.error("❌ فشل الاتصال")
     with tab2:
         if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
             if st.button("دخول المسؤول"):
@@ -144,35 +150,35 @@ if st.session_state['user_type'] == "school":
     st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
     
     # القائمة الجانبية
-    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "الالتقارير"])
+    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
 
-    # نقل زر تسجيل الخروج للأسفل في الوسط
-    st.sidebar.markdown("<br>"*15, unsafe_allow_html=True)
-    col_out1, col_out2, col_out3 = st.sidebar.columns([1, 2, 1])
+    # زر تسجيل الخروج في أسفل القائمة
+    st.sidebar.markdown("<br>"*22, unsafe_allow_html=True)
+    col_out1, col_out2, col_out3 = st.sidebar.columns([0.5, 2, 0.5])
     with col_out2:
-        if st.button("🚪 خروج"):
+        if st.button("🚪 تسجيل الخروج"):
             st.session_state.clear()
             st.rerun()
 
     if menu == "إضافة":
-        # تصميم سطر البحث (العنوان بجانب المستطيل)
-        col_lbl, col_inp = st.columns([1, 3])
+        # تصميم سطر البحث (النص أبيض وبجانب المستطيل)
+        col_lbl, col_inp = st.columns([1.2, 3])
         with col_lbl:
-            st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية:</div>", unsafe_allow_html=True)
+            st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية</div>", unsafe_allow_html=True)
         with col_inp:
-            search_id = st.text_input("", placeholder="أدخل 9 خانات للبحث أو التعديل...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
+            search_id = st.text_input("", placeholder="أدخل رقم الهوية للبحث أو التعديل...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
         found_row, is_main = None, False
         if search_id:
             df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ تم العثور على الموظف: {found_row['name']}")
+            if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ الموظف: {found_row['name']}")
             else:
                 df_c = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-                if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ تم العثور في كشف التصحيح: {found_row['name']}")
-                else: st.warning("ℹ️ الرقم غير مسجل. يمكنك البدء بإدخال بيانات جديدة.")
+                if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ كشف التصحيح: {found_row['name']}")
+                else: st.info("ℹ️ الرقم متاح للتسجيل الجديد.")
 
         if found_row is not None:
-            if st.button("🗑️ حذف هذا السجل"):
+            if st.button("🗑️ حذف السجل"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (search_id,)); c.execute("DELETE FROM correction_table WHERE id_num=?", (search_id,))
                 conn.commit(); st.session_state.reset_key += 1; st.success("✅ تم الحذف"); time.sleep(1); st.rerun()
 
@@ -219,32 +225,29 @@ if st.session_state['user_type'] == "school":
                     rel_details = st.text_input("اسم القريب المباشر رباعياً (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
                     st.selectbox("علاقة القرابة", ["", "ابن/ابنة", "أخ/أخت", "زوج/زوجة", "حفيد/حفيدة"]) 
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى تعبئة الحقول الأساسية")
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى تعبئة الحقول")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
-                            conn.commit(); st.success("✅ تم حفظ الطلب بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
+                            conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1.2); st.rerun()
 
     elif menu == "التقارير":
-        st.subheader("📊 سجلات المدرسة")
+        st.subheader("📊 سجلات المدرسة الموثقة")
         df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
         df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
         if not df1.empty:
-            st.info("🔹 كشف المراقبة والتوظيف")
             df1_view = df1.rename(columns={'id_num':'الهوية','name':'الاسم','phone':'الجوال','address':'السكن','job_title':'الوظيفة','type':'النوع'})
             st.dataframe(df1_view.drop(columns=['school_user','school_full_name']), use_container_width=True)
             st.download_button(label="📥 تحميل كشف المراقبة (Excel)", data=to_excel(df1_view.drop(columns=['school_user','school_full_name'])), file_name='monitoring.xlsx')
         if not df2.empty:
-            st.divider(); st.success("🔹 كشف التصحيح")
+            st.divider()
             df2_view = df2.rename(columns={'id_num':'الهوية','name':'الاسم','address':'السكن','subject':'المبحث', 'branch':'الفرع'})
             st.dataframe(df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']], use_container_width=True)
             st.download_button(label="📥 تحميل كشف التصحيح (Excel)", data=to_excel(df2_view[['الهوية','الاسم','السكن','الفرع','المبحث']]), file_name='correction.xlsx')
 
-# --- 5. واجهة الإدارة ---
 elif st.session_state['user_type'] == "admin":
     st.title("🛠️ لوحة تحكم الإدارة")
-    st.sidebar.markdown("<br>"*15, unsafe_allow_html=True)
-    if st.sidebar.button("🚪 خروج"): st.session_state.clear(); st.rerun()
-    
+    st.sidebar.markdown("<br>"*22, unsafe_allow_html=True)
+    if st.sidebar.button("🚪 تسجيل الخروج"): st.session_state.clear(); st.rerun()
     adm_menu = st.sidebar.selectbox("القائمة:", ["إدارة البيانات", "صلاحيات النماذج"])
     if adm_menu == "صلاحيات النماذج":
         cols = st.columns(3)
