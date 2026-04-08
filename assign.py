@@ -11,7 +11,7 @@ st.markdown("""
     .stApp { direction: rtl; text-align: right; }
     div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
     input, select, textarea { direction: rtl !important; text-align: right !important; }
-    .stHeader { color: #1E3A8A; }
+    .school-title { color: #1E3A8A; background-color: #f0f2f6; padding: 10px; border-radius: 5px; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -27,16 +27,14 @@ c.execute('''CREATE TABLE IF NOT EXISTS tawjihi_table
               desire TEXT, principal_note TEXT)''')
 conn.commit()
 
-# --- 3. إدارة الجلسة ودالة الحسابات ---
+# --- 3. تهيئة الجلسة (Session State) ---
+# حل مشكلة AttributeError: التأكد من وجود المتغيرات منذ البداية
 if 'auth' not in st.session_state:
-    st.session_state.update({'auth': False, 'user_type': "", 'school_display_name': "", 'school_user': ""})
-
-def fetch_accounts():
-    try:
-        df = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
-        df.columns = df.columns.str.strip()
-        return df
-    except: return None
+    st.session_state['auth'] = False
+if 'school_display_name' not in st.session_state:
+    st.session_state['school_display_name'] = ""
+if 'user_type' not in st.session_state:
+    st.session_state['user_type'] = ""
 
 # --- 4. تسجيل الدخول ---
 if not st.session_state['auth']:
@@ -47,40 +45,40 @@ if not st.session_state['auth']:
         u_input = st.text_input("اسم المستخدم (رقم المدرسة)").strip()
         p_input = st.text_input("كلمة المرور", type="password").strip()
         if st.button("تسجيل الدخول"):
-            df_acc = fetch_accounts()
-            if df_acc is not None:
-                # التحقق من الحساب وجلب الاسم الكامل school_full_name
+            try:
+                df_acc = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
+                df_acc.columns = df_acc.columns.str.strip()
                 match = df_acc[(df_acc['school_user'].astype(str) == u_input) & (df_acc['password'].astype(str) == p_input)]
                 if not match.empty:
-                    st.session_state.auth = True
-                    st.session_state.user_type = "school"
-                    st.session_state.school_user = u_input
-                    # هنا السحر: جلب اسم المدرسة من عمود school_full_name
-                    st.session_state.school_display_name = match.iloc[0]['school_full_name']
+                    st.session_state['auth'] = True
+                    st.session_state['user_type'] = "school"
+                    # جلب الاسم من عمود school_full_name
+                    st.session_state['school_display_name'] = match.iloc[0]['school_full_name']
                     st.rerun()
                 else: st.error("❌ بيانات الدخول غير صحيحة")
-            else: st.error("❌ فشل الاتصال ببيانات المدارس")
+            except Exception as e: st.error(f"❌ خطأ في الاتصال: {e}")
     
     with tab2:
-        if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
-            if st.button("دخول الإدارة"):
-                st.session_state.auth, st.session_state.user_type = True, "admin"
+        adm_p = st.text_input("كلمة مرور الإدارة", type="password")
+        if st.button("دخول الإدارة"):
+            if adm_p == "ADMIN2026":
+                st.session_state['auth'], st.session_state['user_type'] = True, "admin"
                 st.rerun()
     st.stop()
 
-# --- 5. واجهة المدارس (التصميم الجديد) ---
-if st.session_state.user_type == "school":
-    # عرض اسم المدرسة في الأعلى بشكل واضح
-    st.markdown(f"<h2 style='text-align: center;'>📝 نموذج مدرسة: {st.session_state.school_display_name}</h2>", unsafe_allow_html=True)
+# --- 5. واجهة المدارس ---
+if st.session_state['user_type'] == "school":
+    # عرض اسم المدرسة بدلاً من الرقم
+    st.markdown(f"<h2 class='school-title'>📝 نموذج مدرسة: {st.session_state['school_display_name']}</h2>", unsafe_allow_html=True)
     
     if st.sidebar.button("تسجيل الخروج"):
-        st.session_state.auth = False
+        st.session_state['auth'] = False
         st.rerun()
 
-    # استخدام حاوية لضمان التفاعل داخل الصندوق
+    # ملاحظة: لكي تظهر الخانات وتختفي داخل الصندوق، نستخدم Form بدون زر الحفظ الداخلي أو نستخدم حيلة Container
     with st.container():
-        with st.form("professional_form", clear_on_submit=True):
-            st.subheader("📋 البيانات الأساسية")
+        # بدأنا النموذج (Form)
+        with st.form("my_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
                 t_name = st.text_input("اسم المعلم رباعي")
@@ -92,19 +90,14 @@ if st.session_state.user_type == "school":
                 t_job = st.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
 
             st.divider()
-            st.subheader("🔍 إعدادات إضافية (داخل الصندوق)")
             
-            # وضع الخانات داخل الصندوق بشكل مرتب
+            # لجعل الخانات تظهر/تختفي "داخل" الصندوق بشكل تفاعلي، 
+            # سنستخدم مربعات نص عادية، ونطلب من المستخدم تعبئتها "إذا وجد"
             c_opt1, c_opt2 = st.columns(2)
             with c_opt1:
-                # ملاحظة: في الـ Form، الخانات لا تفتح حقولاً جديدة فوراً إلا إذا كانت خارجها.
-                # لجعلها تعمل "داخل" وبشكل "أحلى"، سنضع الحقول ونطلب تعبئتها إذا رغب المستخدم.
-                has_school2 = st.checkbox("المعلم يعمل في مدرسة ثانية")
-                t_school2 = st.text_input("اسم المدرسة الثانية", help="اكتب الاسم هنا إذا فعلت الخيار أعلاه")
-            
+                t_school2 = st.text_input("اسم المدرسة الثانية (اتركه فارغاً إذا لا يوجد)")
             with c_opt2:
-                has_relative = st.radio("هل له قريب مباشر في الامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
-                t_rel_name = st.text_input("اسم القريب المباشر", help="اكتب الاسم هنا إذا اخترت يوجد")
+                t_rel_name = st.text_input("اسم القريب المباشر في الامتحان (اتركه فارغاً إذا لا يوجد)")
 
             st.divider()
             col_end1, col_end2 = st.columns(2)
@@ -113,17 +106,19 @@ if st.session_state.user_type == "school":
             with col_end2:
                 t_note = st.radio("رأي المدير (هل يصلح للعمل؟):", ["يصلح", "لا يصلح"], horizontal=True)
 
-            if st.form_submit_button("حفظ وإرسال البيانات"):
+            submit = st.form_submit_button("💾 حفظ البيانات وإرسالها")
+            
+            if submit:
                 if t_name and t_id:
                     c.execute("INSERT OR REPLACE INTO tawjihi_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                              (t_id, t_name, st.session_state.school_display_name, t_school2, t_phone, t_city, t_village, t_rel_name, t_job, t_desire, t_note))
+                              (t_id, t_name, st.session_state['school_display_name'], t_school2, t_phone, t_city, t_village, t_rel_name, t_job, t_desire, t_note))
                     conn.commit()
-                    st.success(f"✅ تم حفظ بيانات المعلم {t_name} في سجلات {st.session_state.school_display_name}")
+                    st.success(f"✅ تم بنجاح حفظ بيانات: {t_name}")
                 else:
-                    st.error("⚠️ يرجى تعبئة الاسم ورقم الهوية")
+                    st.error("⚠️ يرجى إدخال الاسم ورقم الهوية على الأقل")
 
 # --- 6. لوحة المدير ---
-elif st.session_state.user_type == "admin":
+elif st.session_state['user_type'] == "admin":
     st.title("🛠️ لوحة الإدارة المركزية")
     df = pd.read_sql("SELECT * FROM tawjihi_table", conn)
     st.dataframe(df, use_container_width=True)
