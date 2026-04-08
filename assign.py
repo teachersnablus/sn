@@ -95,7 +95,6 @@ if st.session_state['user_type'] == "school":
             id_num = st.text_input("رقم الهوية")
             phone = st.text_input("رقم الجوال")
         with col2:
-            # الترتيب الجديد المطلوب
             city = st.text_input("المدينة")
             village = st.text_input("القرية (إن وجد)")
             job = st.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
@@ -110,6 +109,7 @@ if st.session_state['user_type'] == "school":
 
         st.divider()
         
+        # التعديل: إخفاء حقل الملاحظات في التوظيف والاكتفاء بحقول الثانوية العامة
         if mode == "الثانوية العامة":
             e1, e2 = st.columns(2)
             with e1:
@@ -118,7 +118,7 @@ if st.session_state['user_type'] == "school":
                 note = st.radio("رأي المدير (هل يصلح؟):", ["يصلح", "لا يصلح"], horizontal=True)
         else:
             desire = "متقدم لتوظيف"
-            note = st.text_area("ملاحظات إضافية حول طلب التوظيف")
+            note = "" # لا ملاحظات إضافية حسب طلبك
 
         if st.form_submit_button("💾 حفظ البيانات وإرسالها"):
             if name and id_num:
