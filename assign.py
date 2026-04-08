@@ -20,7 +20,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v16.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v17.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -49,9 +49,9 @@ def get_form_status(form_name):
     res = c.fetchone()
     return res[0] == 1 if res else True
 
-# مفتاح التحكم في تفريغ النماذج
-if 'form_reset_key' not in st.session_state:
-    st.session_state.form_reset_key = 0
+# مفتاح التحكم في تفريغ النماذج والبحث
+if 'reset_key' not in st.session_state:
+    st.session_state.reset_key = 0
 
 # --- 3. تسجيل الدخول ---
 if 'auth' not in st.session_state:
@@ -89,7 +89,9 @@ if st.session_state['user_type'] == "school":
 
     if menu == "تعبئة وبحث (إدارة الموظف)":
         st.markdown("<div class='search-section'>🔎 <b>إدارة الموظف:</b> ابحث برقم الهوية للتعديل أو الحذف.</div>", unsafe_allow_html=True)
-        search_id = st.text_input("أدخل رقم الهوية للبحث:", key="main_search_input").strip()
+        
+        # إضافة مفتاح للبحث لتفريغه عند الحفظ
+        search_id = st.text_input("أدخل رقم الهوية للبحث:", key=f"search_input_{st.session_state.reset_key}").strip()
         
         found_row = None
         is_main = False
@@ -112,7 +114,7 @@ if st.session_state['user_type'] == "school":
                 c.execute("DELETE FROM main_table WHERE id_num=?", (search_id,))
                 c.execute("DELETE FROM correction_table WHERE id_num=?", (search_id,))
                 conn.commit()
-                st.session_state.form_reset_key += 1
+                st.session_state.reset_key += 1 # تفريغ البحث والنموذج
                 st.success("✅ تم الحذف وتفريغ البيانات")
                 time.sleep(1)
                 st.rerun()
@@ -125,7 +127,7 @@ if st.session_state['user_type'] == "school":
                 default_mode = found_row['type'] if (found_row is not None and is_main) else mode_list[0]
                 mode = st.radio("نوع النموذج:", mode_list, index=mode_list.index(default_mode) if default_mode in mode_list else 0)
                 
-                with st.form(key=f"m_form_{st.session_state.form_reset_key}"):
+                with st.form(key=f"m_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     id_num = c2.text_input("رقم الهوية (9 خانات) *", value=search_id)
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main) else "")
@@ -153,20 +155,19 @@ if st.session_state['user_type'] == "school":
                         if not (name and id_num and phone and city and village and job):
                             st.error("⚠️ يرجى تعبئة الحقول الإجبارية")
                         elif len(id_num) != 9 or len(phone) != 10:
-                            st.error("❌ تأكد من عدد خانات الهوية (9) والجوال (10)")
+                            st.error("❌ تأكد من عدد الخانات للهوية والجوال")
                         else:
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, city, village, rel_ex, job, desire, note, mode))
                             conn.commit()
-                            st.success("✅ تم الحفظ بنجاح")
-                            # تفريغ البيانات من خلال تغيير المفتاح ومسح مدخل البحث
-                            st.session_state.form_reset_key += 1
+                            st.success("✅ تم حفظ التعديلات بنجاح")
+                            st.session_state.reset_key += 1 # تفريغ البحث والنموذج فوراً
                             time.sleep(1.2)
                             st.rerun()
 
         with t_c:
             if get_form_status('تصحيح'):
-                with st.form(key=f"c_form_{st.session_state.form_reset_key}"):
+                with st.form(key=f"c_form_{st.session_state.reset_key}"):
                     c_id = st.text_input("رقم الهوية (9 خانات) *", value=search_id)
                     c_name = st.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
                     c_phone = st.text_input("الجوال (10 خانات) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
@@ -177,15 +178,15 @@ if st.session_state['user_type'] == "school":
                     
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
                         if not (c_name and c_id and c_phone and c_subj):
-                            st.error("⚠️ يرجى تعبئة كافة الحقول")
+                            st.error("⚠️ يرجى تعبئة الحقول")
                         elif len(c_id) != 9 or len(c_phone) != 10:
                             st.error("❌ تأكد من عدد الخانات")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                       (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", "", "", "", "", c_phone))
                             conn.commit()
-                            st.success("✅ تم الحفظ بنجاح")
-                            st.session_state.form_reset_key += 1
+                            st.success("✅ تم الحفظ وتفريغ البيانات")
+                            st.session_state.reset_key += 1
                             time.sleep(1.2)
                             st.rerun()
 
@@ -200,7 +201,7 @@ if st.session_state['user_type'] == "school":
             st.dataframe(df1_view.drop(columns=['school_user','school_full_name']), use_container_width=True)
             df1_excel = df1_view.drop(columns=['school_user','school_full_name']).copy()
             df1_excel['توقيع الموظف'] = "________________"
-            st.download_button(label="📥 تحميل (Excel)", data=to_excel(df1_excel), file_name='list_1.xlsx')
+            st.download_button(label="📥 تحميل (Excel)", data=to_excel(df1_excel), file_name='monitoring.xlsx')
 
         if not df2.empty:
             st.divider()
@@ -209,7 +210,7 @@ if st.session_state['user_type'] == "school":
             st.dataframe(df2_view[['الهوية','الاسم','المبحث']], use_container_width=True)
             df2_excel = df2_view[['الهوية','الاسم','المبحث']].copy()
             df2_excel['توقيع الموظف'] = "________________"
-            st.download_button(label="📥 تحميل (Excel)", data=to_excel(df2_excel), file_name='list_2.xlsx')
+            st.download_button(label="📥 تحميل (Excel)", data=to_excel(df2_excel), file_name='correction.xlsx')
 
 # --- 5. واجهة الإدارة ---
 elif st.session_state['user_type'] == "admin":
