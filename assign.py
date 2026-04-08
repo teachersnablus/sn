@@ -11,7 +11,7 @@ st.markdown("""
     .stApp { direction: rtl; text-align: right; }
     div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
     input, select, textarea { direction: rtl !important; text-align: right !important; }
-    .school-title { color: #1E3A8A; background-color: #f0f2f6; padding: 15px; border-radius: 8px; text-align: center; border-right: 5px solid #1E3A8A; margin-bottom: 20px; }
+    .school-title { color: #1E3A8A; background-color: #f0f2f6; padding: 15px; border-radius: 8px; text-align: center; border-right: 5px solid #1E3A8A; margin-bottom: 20px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -41,21 +41,23 @@ if not st.session_state['auth']:
         p_input = st.text_input("كلمة المرور", type="password").strip()
         if st.button("تسجيل الدخول"):
             try:
-                # جلب البيانات وتنظيف أسماء الأعمدة من أي مسافات زائدة
+                # جلب البيانات وتنظيف شامل للأعمدة والبيانات
                 df_acc = pd.read_csv(SCHOOLS_ACCOUNTS_URL)
-                df_acc.columns = df_acc.columns.str.strip()
+                df_acc.columns = df_acc.columns.str.strip() # إزالة المسافات من أسماء الأعمدة
                 
-                # البحث عن الحساب المطابق
-                match = df_acc[(df_acc['school_user'].astype(str) == u_input) & (df_acc['password'].astype(str) == p_input)]
+                # تحويل كل الأعمدة لنصوص وإزالة المسافات من القيم للمقارنة الدقيقة
+                df_acc['school_user'] = df_acc['school_user'].astype(str).str.strip()
+                df_acc['password'] = df_acc['password'].astype(str).str.strip()
+                
+                match = df_acc[(df_acc['school_user'] == u_input) & (df_acc['password'] == p_input)]
                 
                 if not match.empty:
                     st.session_state['auth'] = True
                     st.session_state['user_type'] = "school"
                     
-                    # جلب اسم المدرسة من عمود school_full_name حصراً
+                    # محاولة جلب الاسم من العمود المحدد
                     if 'school_full_name' in df_acc.columns:
-                        school_val = match.iloc[0]['school_full_name']
-                        st.session_state['school_display_name'] = str(school_val)
+                        st.session_state['school_display_name'] = str(match.iloc[0]['school_full_name']).strip()
                     else:
                         st.session_state['school_display_name'] = u_input
                     
@@ -63,23 +65,22 @@ if not st.session_state['auth']:
                 else: 
                     st.error("❌ بيانات الدخول غير صحيحة")
             except Exception as e: 
-                st.error(f"❌ خطأ في قراءة ملف الإكسل: {e}")
+                st.error(f"❌ خطأ: تأكد من رابط ملف الإكسل أو أسماء الأعمدة. التفاصيل: {e}")
     
     with tab2:
-        adm_pass = st.text_input("كلمة مرور الإدارة", type="password")
-        if st.button("دخول الإدارة"):
-            if adm_pass == "ADMIN2026":
+        if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
+            if st.button("دخول الإدارة"):
                 st.session_state.auth, st.session_state.user_type = True, "admin"
                 st.rerun()
     st.stop()
 
 # --- 5. واجهة المدارس ---
 if st.session_state['user_type'] == "school":
-    # عرض اسم المدرسة الذي تم جلبه
-    st.markdown(f"<h2 class='school-title'>📝 نموذج مدرسة: {st.session_state['school_display_name']}</h2>", unsafe_allow_html=True)
+    # عرض اسم المدرسة بوضوح
+    st.markdown(f"<div class='school-title'>🏢 نموذج مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
     
     if st.sidebar.button("تسجيل الخروج"):
-        st.session_state.auth = False
+        for key in st.session_state.keys(): del st.session_state[key]
         st.rerun()
 
     mode = st.radio("اختر نوع النموذج:", ["الثانوية العامة", "امتحان التوظيف"], horizontal=True)
@@ -102,8 +103,8 @@ if st.session_state['user_type'] == "school":
         with c1:
             school2 = st.text_input("اسم المدرسة الثانية (إن وجد)")
         with c2:
-            # التعديل المطلوب: امتحان القريب المباشر
-            rel_exam = st.text_input("امتحان القريب المباشر (إن وجد - اذكر أكثر من امتحان إن وجد)")
+            # التعديل المطلوب: امتحان القريب المباشر للتوظيف أو الثانوية
+            rel_exam = st.text_input("امتحان القريب المباشر (اذكر الامتحان أو الامتحانات إن وجد)")
 
         st.divider()
         
@@ -112,18 +113,18 @@ if st.session_state['user_type'] == "school":
             with e1:
                 desire = st.radio("هل يرغب بالمراقبة؟", ["يرغب", "لا يرغب"], horizontal=True)
             with e2:
-                note = st.radio("رأي المدير (يصلح؟):", ["يصلح", "لا يصلح"], horizontal=True)
+                note = st.radio("رأي المدير (هل يصلح للعمل؟):", ["يصلح", "لا يصلح"], horizontal=True)
         else:
-            desire = "توظيف"
-            note = st.text_area("ملاحظات إضافية حول طلب التوظيف")
+            desire = "متقدم للامتحان"
+            note = st.text_area("ملاحظات إضافية بخصوص امتحان التوظيف")
 
-        if st.form_submit_button("💾 حفظ وإرسال البيانات"):
+        if st.form_submit_button("💾 حفظ البيانات"):
             if name and id_num:
                 c.execute("INSERT OR REPLACE INTO tawjihi_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                           (id_num, name, st.session_state['school_display_name'], school2, phone, city, village, rel_exam, job, desire, note, mode))
                 conn.commit()
-                st.success(f"✅ تم حفظ بيانات {name} بنجاح")
-            else: st.error("⚠️ يرجى تعبئة الحقول الأساسية (الاسم ورقم الهوية)")
+                st.success(f"✅ تم حفظ بيانات {name} بنجاح في سجلات {st.session_state['school_display_name']}")
+            else: st.error("⚠️ يرجى كتابة الاسم ورقم الهوية")
 
 # --- 6. لوحة الإدارة ---
 elif st.session_state['user_type'] == "admin":
@@ -133,4 +134,4 @@ elif st.session_state['user_type'] == "admin":
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False)
-    st.download_button("📥 تحميل Excel", data=buffer.getvalue(), file_name="Data_2026.xlsx")
+    st.download_button("📥 تحميل كافة البيانات Excel", data=buffer.getvalue(), file_name="Reports_2026.xlsx")
