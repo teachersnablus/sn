@@ -90,7 +90,6 @@ if st.session_state['user_type'] == "school":
     menu = st.sidebar.radio("القائمة:", ["تعبئة نماذج جديدة", "استعراض وحذف بياناتنا"])
 
     if menu == "تعبئة نماذج جديدة":
-        # فحص الصلاحيات
         open_tawjihi = get_form_status('ثانوية')
         open_employment = get_form_status('توظيف')
         open_correct = get_form_status('تصحيح')
@@ -178,7 +177,6 @@ if st.session_state['user_type'] == "school":
         
         target_del = st.text_input("للحذف: أدخل رقم الهوية من سجلات مدرستك")
         if st.button("❌ حذف السجل المختار"):
-            # التأكد أن السجل يخص المدرسة قبل الحذف
             c.execute("DELETE FROM main_table WHERE id_num=? AND school_user=?", (target_del, st.session_state['school_user']))
             c.execute("DELETE FROM correction_table WHERE id_num=? AND school_user=?", (target_del, st.session_state['school_user']))
             conn.commit()
@@ -202,7 +200,9 @@ elif st.session_state['user_type'] == "admin":
                 current_st = get_form_status(f_key)
                 st.markdown(f"### {f_label}")
                 st.write("الحالة الحالية:", "✅ مفتوح" if current_st else "❌ مغلق")
-                if st.button(f"تغيير حالة {f_label}", key=f_btn_key:=f"btn_{f_key}"):
+                # تم تصحيح السطر المسبب للخطأ هنا
+                btn_key_id = f"btn_toggle_{f_key}"
+                if st.button(f"تغيير حالة {f_label}", key=btn_key_id):
                     new_st = 0 if current_st else 1
                     c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (new_st, f_key))
                     conn.commit()
@@ -213,41 +213,37 @@ elif st.session_state['user_type'] == "admin":
 
         def admin_view(table_label, db_type, is_correction=False):
             st.markdown(f"<div class='admin-header'>إدارة بيانات {table_label}</div>", unsafe_allow_html=True)
-            
             if is_correction:
                 df = pd.read_sql("SELECT * FROM correction_table", conn)
             else:
                 df = pd.read_sql(f"SELECT * FROM main_table WHERE type='{db_type}'", conn)
 
             if df.empty:
-                st.info("لا توجد بيانات حالياً في هذا القسم.")
+                st.info("لا توجد بيانات حالياً.")
                 return
 
-            # قائمة منسدلة للمدارس
             schools = ["الكل"] + sorted(df['school_full_name'].unique().tolist())
             sel_school = st.selectbox(f"تصفية حسب المدرسة ({table_label}):", schools)
-            
             final_df = df if sel_school == "الكل" else df[df['school_full_name'] == sel_school]
             st.dataframe(final_df, use_container_width=True)
 
-            # التعديل والحذف
             col_id, col_act = st.columns([2, 1])
             with col_id:
-                target_id = st.selectbox(f"اختر الهوية للتعديل أو الحذف ({table_label}):", [""] + final_df['id_num'].tolist())
+                target_id = st.selectbox(f"اختر الهوية للإجراء ({table_label}):", [""] + final_df['id_num'].tolist())
             
             if target_id:
                 row = final_df[final_df['id_num'] == target_id].iloc[0]
                 with st.expander(f"📝 تعديل بيانات: {row['name']}"):
-                    new_n = st.text_input("الاسم", value=row['name'], key=f"n_{target_id}")
-                    new_p = st.text_input("الهاتف", value=row['phone'], key=f"p_{target_id}")
-                    if st.button("💾 حفظ التعديل", key=f"sv_{target_id}"):
+                    new_n = st.text_input("الاسم", value=row['name'], key=f"n_{target_id}_{table_label}")
+                    new_p = st.text_input("الهاتف", value=row['phone'], key=f"p_{target_id}_{table_label}")
+                    if st.button("💾 حفظ التعديل", key=f"sv_{target_id}_{table_label}"):
                         tbl = "correction_table" if is_correction else "main_table"
                         c.execute(f"UPDATE {tbl} SET name=?, phone=? WHERE id_num=?", (new_n, new_p, target_id))
                         conn.commit()
                         st.success("تم التحديث")
                         st.rerun()
                 
-                if st.button(f"🗑️ حذف السجل {target_id}", key=f"del_{target_id}"):
+                if st.button(f"🗑️ حذف السجل {target_id}", key=f"del_{target_id}_{table_label}"):
                     tbl = "correction_table" if is_correction else "main_table"
                     delete_record(tbl, target_id)
 
