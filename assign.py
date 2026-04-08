@@ -3,7 +3,7 @@ import pandas as pd
 import sqlite3
 
 # --- 1. إعدادات الصفحة والتنسيق ---
-st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026 - الإدارة", layout="wide")
+st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,16 +11,14 @@ st.markdown("""
     div[data-testid="stForm"] { text-align: right; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
     input, select, textarea { direction: rtl !important; text-align: right !important; }
     .school-title { color: #ffffff; background-color: #1E3A8A; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 25px; }
-    .admin-header { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-right: 5px solid #1E3A8A; margin-bottom: 20px; }
     .search-section { background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #1E3A8A; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# رابط ملف الحسابات
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v6.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v7.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -38,7 +36,6 @@ for form in ['ثانوية', 'توظيف', 'تصحيح']:
     c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
 
-# --- 3. وظائف النظام ---
 def get_form_status(form_name):
     c.execute("SELECT is_open FROM system_settings WHERE form_name=?", (form_name,))
     res = c.fetchone()
@@ -50,8 +47,8 @@ if 'auth' not in st.session_state:
 
 if not st.session_state['auth']:
     st.title("🏛️ بوابة مديرية التربية والتعليم - جنوب نابلس")
-    tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
-    with tab1:
+    t1, t2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
+    with t1:
         u_in = st.text_input("رقم المدرسة").strip()
         p_in = st.text_input("كلمة المرور", type="password").strip()
         if st.button("دخول المدارس"):
@@ -62,8 +59,8 @@ if not st.session_state['auth']:
                     st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
                     st.rerun()
                 else: st.error("❌ بيانات خاطئة")
-            except: st.error("❌ فشل الاتصال")
-    with tab2:
+            except: st.error("❌ فشل الاتصال بالحسابات")
+    with t2:
         if st.text_input("كلمة مرور الإدارة", type="password") == "ADMIN2026":
             if st.button("دخول المسؤول"):
                 st.session_state.update({'auth': True, 'user_type': "admin"})
@@ -79,92 +76,101 @@ if st.session_state['user_type'] == "school":
     menu = st.sidebar.radio("القائمة:", ["تعبئة وبحث", "استعراض وتعديل السجلات"])
 
     if menu == "تعبئة وبحث":
-        st.markdown("<div class='search-section'>🔎 <b>بحث سريع برقم الهوية:</b> أدخل الرقم لجلب البيانات وتعديلها تلقائياً.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='search-section'>🔎 <b>بحث سريع:</b> أدخل رقم الهوية لجلب البيانات وتعديلها.</div>", unsafe_allow_html=True)
         search_id = st.text_input("رقم الهوية للبحث:")
         
         found_row = None
-        is_in_main = False
-        
+        is_main = False
         if search_id:
-            df_m_search = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-            if not df_m_search.empty:
-                found_row = df_m_search.iloc[0]
-                is_in_main = True
+            df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
+            if not df_m.empty:
+                found_row = df_m.iloc[0]; is_main = True
             else:
-                df_c_search = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
-                if not df_c_search.empty:
-                    found_row = df_c_search.iloc[0]
-                    is_in_main = False
+                df_c = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
+                if not df_c.empty:
+                    found_row = df_c.iloc[0]; is_main = False
 
-        t_m, t_c = st.tabs(["📝 مراقبة وتوظيف", "✍️ تصحيح"])
+        tab_m, tab_c = st.tabs(["📝 مراقبة وتوظيف", "✍️ تصحيح"])
         
-        with t_m:
+        with tab_m:
             if get_form_status('ثانوية') or get_form_status('توظيف'):
                 mode = st.radio("نوع النموذج:", ["الثانوية العامة", "امتحان التوظيف"], horizontal=True)
                 with st.form("main_form", clear_on_submit=True):
                     col1, col2 = st.columns(2)
-                    name = col1.text_input("الاسم رباعي", value=found_row['name'] if (found_row is not None and is_in_main) else "")
-                    id_num = col2.text_input("رقم الهوية (إلزامي)", value=search_id)
-                    phone = col1.text_input("رقم الجوال", value=found_row['phone'] if (found_row is not None and is_in_main) else "")
-                    city = col2.text_input("المدينة", value=found_row['city'] if (found_row is not None and is_in_main) else "")
-                    village = col1.text_input("القرية", value=found_row['village'] if (found_row is not None and is_in_main) else "")
-                    job = col2.selectbox("الوظيفة", ["معلم", "مدير مدرسة", "سكرتير", "آذن"])
+                    name = col1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main) else "")
+                    id_num = col2.text_input("رقم الهوية *", value=search_id)
+                    phone = col1.text_input("رقم الجوال *", value=found_row['phone'] if (found_row is not None and is_main) else "")
+                    city = col2.text_input("المدينة *", value=found_row['city'] if (found_row is not None and is_main) else "")
+                    village = col1.text_input("القرية *", value=found_row['village'] if (found_row is not None and is_main) else "")
+                    job = col2.selectbox("الوظيفة *", ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"], index=0)
+                    
                     st.divider()
-                    school2 = st.text_input("المدرسة الثانية", value=found_row['school2'] if (found_row is not None and is_in_main) else "")
-                    rel_ex = st.text_input("قريب مباشر في الامتحان", value=found_row['relative_exam'] if (found_row is not None and is_in_main) else "")
-                    if st.form_submit_button("💾 حفظ وإفراغ الخانات"):
-                        if not id_num.strip(): st.error("⚠️ رقم الهوية مطلوب!")
+                    school2 = st.text_input("المدرسة الثانية (اختياري)")
+                    rel_ex = st.text_input("اسم القريب وامتحان القريب (اختياري)")
+                    
+                    c3, c4 = st.columns(2)
+                    desire = c3.radio("الرغبة بالعمل:", ["يرغب", "لا يرغب"], horizontal=True)
+                    note = c4.radio("رأي مدير المدرسة:", ["يصلح", "لا يصلح"], horizontal=True)
+
+                    if st.form_submit_button("💾 حفظ البيانات"):
+                        # فحص الحقول الإجبارية
+                        if not (name and id_num and phone and city and village and job):
+                            st.error("⚠️ يرجى تعبئة كافة الحقول التي تحتوي على (*) إجبارياً")
                         else:
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                                      (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, city, village, rel_ex, job, "", "", mode))
-                            conn.commit(); st.success("✅ تم الحفظ"); st.rerun()
-            else: st.warning("النماذج مغلقة")
+                                      (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, city, village, rel_ex, job, desire, note, mode))
+                            conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.rerun()
+            else: st.warning("النماذج مغلقة حالياً")
 
-        with t_c:
+        with tab_c:
             if get_form_status('تصحيح'):
                 with st.form("corr_form", clear_on_submit=True):
-                    c_name = st.text_input("الاسم الرباعي", value=found_row['name'] if (found_row is not None and not is_in_main) else "")
-                    c_id = st.text_input("رقم الهوية ", value=search_id)
-                    c_subj = st.selectbox("المبحث", ["اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"])
-                    c_phone = st.text_input("الجوال ", value=found_row['phone'] if (found_row is not None and not is_in_main) else "")
+                    c_name = st.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
+                    c_id = st.text_input("رقم الهوية *", value=search_id)
+                    c_phone = st.text_input("الجوال *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
+                    c_city = st.text_input("المدينة *")
+                    c_subj = st.selectbox("المبحث *", ["", "اللغة العربية", "اللغة الانجليزية", "الرياضيات", "أخرى"])
+                    
+                    st.divider()
+                    has_rel = st.radio("هل يوجد قريب مباشر؟", ["لا", "نعم"], horizontal=True)
+                    rel_info = st.text_input("تفاصيل القريب (اختياري)")
+
                     if st.form_submit_button("💾 حفظ طلب التصحيح"):
-                        if not c_id.strip(): st.error("⚠️ رقم الهوية مطلوب!")
+                        if not (c_name and c_id and c_phone and c_city and c_subj):
+                            st.error("⚠️ يرجى تعبئة الحقول الأساسية لطلب التصحيح")
                         else:
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                                      (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", "", "", "", "", c_phone))
+                                      (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", c_city, "", has_rel, rel_info, c_phone))
                             conn.commit(); st.success("✅ تم الحفظ"); st.rerun()
 
     elif menu == "استعراض وتعديل السجلات":
         df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
         df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
-        st.write("📊 سجلات مدرستكم:")
-        if not df1.empty: st.dataframe(df1)
-        if not df2.empty: st.dataframe(df2)
+        if not df1.empty: st.write("📊 مراقبة وتوظيف:"); st.dataframe(df1)
+        if not df2.empty: st.write("✍️ تصحيح:"); st.dataframe(df2)
         
         st.divider()
         all_ids = list(set(df1['id_num'].tolist() + df2['id_num'].tolist()))
-        target = st.selectbox("اختر رقم الهوية للتعديل أو الحذف:", [""] + all_ids)
-        
+        target = st.selectbox("اختر الهوية للتعديل أو الحذف:", [""] + all_ids)
         if target:
             is_m = target in df1['id_num'].values
             row = df1[df1['id_num']==target].iloc[0] if is_m else df2[df2['id_num']==target].iloc[0]
             with st.expander(f"🛠️ تعديل شامل: {row['name']}"):
-                un = st.text_input("الاسم", value=row['name'], key="sch_edit_n")
-                up = st.text_input("الجوال", value=row['phone'], key="sch_edit_p")
-                uc = st.text_input("المدينة", value=row['city'], key="sch_edit_c")
-                uv = st.text_input("القرية", value=row['village'], key="sch_edit_v")
-                if st.button("💾 حفظ التعديلات", key="sch_save_btn"):
+                un = st.text_input("الاسم", value=row['name'], key="e_n")
+                up = st.text_input("الجوال", value=row['phone'], key="e_p")
+                uc = st.text_input("المدينة", value=row['city'], key="e_c")
+                if st.button("💾 حفظ التعديلات"):
                     tbl = "main_table" if is_m else "correction_table"
-                    c.execute(f"UPDATE {tbl} SET name=?, phone=?, city=?, village=? WHERE id_num=?", (un, up, uc, uv, target))
+                    c.execute(f"UPDATE {tbl} SET name=?, phone=?, city=? WHERE id_num=?", (un, up, uc, target))
                     conn.commit(); st.success("تم التحديث"); st.rerun()
-            if st.button("🗑️ حذف السجل", key="sch_del_btn"):
+            if st.button("🗑️ حذف السجل"):
                 c.execute("DELETE FROM main_table WHERE id_num=?", (target,))
                 c.execute("DELETE FROM correction_table WHERE id_num=?", (target,))
                 conn.commit(); st.rerun()
 
 # --- 6. واجهة الإدارة ---
 elif st.session_state['user_type'] == "admin":
-    st.title("🛠️ التحكم المركزي - الإدارة")
+    st.title("🛠️ لوحة تحكم مديرية جنوب نابلس")
     if st.sidebar.button("خروج"): st.session_state.clear(); st.rerun()
     
     adm_menu = st.sidebar.selectbox("القائمة:", ["إدارة البيانات", "صلاحيات النماذج"])
@@ -174,44 +180,32 @@ elif st.session_state['user_type'] == "admin":
         for i, f in enumerate(['ثانوية', 'توظيف', 'تصحيح']):
             with cols[i]:
                 curr = get_form_status(f)
-                st.write(f"نموذج {f} - الحالة: {'✅ مفتوح' if curr else '❌ مغلق'}")
-                if st.button(f"تغيير الحالة لـ {f}", key=f"adm_toggle_{f}"):
+                st.write(f"نموذج {f}: {'✅ مفتوح' if curr else '❌ مغلق'}")
+                if st.button(f"تبديل حالة {f}", key=f"t_{f}"):
                     c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f))
                     conn.commit(); st.rerun()
     else:
         tab1, tab2, tab3 = st.tabs(["المراقبة", "التوظيف", "التصحيح"])
-        
-        def admin_view_and_edit(t_name, d_type, k_s, is_c=False):
+        def view_admin(t_name, d_type, k_s, is_c=False):
             df = pd.read_sql("SELECT * FROM correction_table", conn) if is_c else pd.read_sql(f"SELECT * FROM main_table WHERE type='{d_type}'", conn)
-            schools = ["الكل"] + sorted(df['school_full_name'].unique().tolist())
-            sel = st.selectbox(f"فلترة حسب مدرسة ({t_name}):", schools, key=f"adm_sel_{k_s}")
+            sel = st.selectbox(f"مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].unique().tolist()), key=f"s_{k_s}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             st.dataframe(f_df)
-            
-            st.write("---")
-            target_id = st.selectbox(f"اختر موظف من ({t_name}) للإجراء:", [""] + f_df['id_num'].tolist(), key=f"adm_select_{k_s}")
-            
-            if target_id:
-                row_data = f_df[f_df['id_num'] == target_id].iloc[0]
-                col_e, col_d = st.columns(2)
-                
-                with col_e:
-                    with st.expander(f"📝 تعديل بيانات: {row_data['name']}"):
-                        adm_un = st.text_input("الاسم", value=row_data['name'], key=f"adm_un_{k_s}_{target_id}")
-                        adm_up = st.text_input("الجوال", value=row_data['phone'], key=f"adm_up_{k_s}_{target_id}")
-                        adm_uc = st.text_input("المدينة", value=row_data['city'], key=f"adm_uc_{k_s}_{target_id}")
-                        adm_uv = st.text_input("القرية", value=row_data['village'], key=f"adm_uv_{k_s}_{target_id}")
-                        if st.button("💾 حفظ التعديلات الإدارية", key=f"adm_save_{k_s}_{target_id}"):
-                            tbl_name = "correction_table" if is_c else "main_table"
-                            c.execute(f"UPDATE {tbl_name} SET name=?, phone=?, city=?, village=? WHERE id_num=?", (adm_un, adm_up, adm_uc, adm_uv, target_id))
-                            conn.commit(); st.success("تم تحديث البيانات بنجاح"); st.rerun()
-                
-                with col_d:
-                    if st.button(f"🗑️ حذف السجل {target_id}", key=f"adm_del_{k_s}_{target_id}"):
-                        tbl_name = "correction_table" if is_c else "main_table"
-                        c.execute(f"DELETE FROM {tbl_name} WHERE id_num=?", (target_id,))
-                        conn.commit(); st.success("تم الحذف"); st.rerun()
+            target = st.selectbox(f"إجراء على هوية ({t_name}):", [""] + f_df['id_num'].tolist(), key=f"id_{k_s}")
+            if target:
+                row = f_df[f_df['id_num']==target].iloc[0]
+                with st.expander(f"📝 تعديل إداري: {row['name']}"):
+                    n_un = st.text_input("الاسم", value=row['name'], key=f"un_{k_s}_{target}")
+                    n_up = st.text_input("الجوال", value=row['phone'], key=f"up_{k_s}_{target}")
+                    if st.button("💾 حفظ", key=f"sv_{k_s}_{target}"):
+                        tbl = "correction_table" if is_c else "main_table"
+                        c.execute(f"UPDATE {tbl} SET name=?, phone=? WHERE id_num=?", (n_un, n_up, target))
+                        conn.commit(); st.success("تم التحديث"); st.rerun()
+                if st.button(f"🗑️ حذف {target}", key=f"del_{k_s}_{target}"):
+                    tbl = "correction_table" if is_c else "main_table"
+                    c.execute(f"DELETE FROM {tbl} WHERE id_num=?", (target,))
+                    conn.commit(); st.rerun()
 
-        with tab1: admin_view_and_edit("ثانوية عامة", "الثانوية العامة", "tw")
-        with tab2: admin_view_and_edit("توظيف", "امتحان التوظيف", "em")
-        with tab3: admin_view_and_edit("تصحيح", "", "cr", True)
+        with tab1: view_admin("ثانوية عامة", "الثانوية العامة", "tw")
+        with tab2: view_admin("توظيف", "امتحان التوظيف", "em")
+        with tab3: view_admin("تصحيح", "", "cr", True)
