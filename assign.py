@@ -20,7 +20,7 @@ st.markdown("""
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
 # --- 2. قاعدة البيانات ---
-conn = sqlite3.connect("exams_system_final_v15.db", check_same_thread=False)
+conn = sqlite3.connect("exams_system_final_v16.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
@@ -53,7 +53,7 @@ def get_form_status(form_name):
 if 'form_reset_key' not in st.session_state:
     st.session_state.form_reset_key = 0
 
-# --- 3. نظام تسجيل الدخول ---
+# --- 3. تسجيل الدخول ---
 if 'auth' not in st.session_state:
     st.session_state.update({'auth': False, 'school_display_name': "", 'school_user': "", 'user_type': ""})
 
@@ -89,7 +89,7 @@ if st.session_state['user_type'] == "school":
 
     if menu == "تعبئة وبحث (إدارة الموظف)":
         st.markdown("<div class='search-section'>🔎 <b>إدارة الموظف:</b> ابحث برقم الهوية للتعديل أو الحذف.</div>", unsafe_allow_html=True)
-        search_id = st.text_input("أدخل رقم الهوية للبحث:").strip()
+        search_id = st.text_input("أدخل رقم الهوية للبحث:", key="main_search_input").strip()
         
         found_row = None
         is_main = False
@@ -158,7 +158,8 @@ if st.session_state['user_type'] == "school":
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, city, village, rel_ex, job, desire, note, mode))
                             conn.commit()
-                            st.success("✅ تم حفظ البيانات بنجاح")
+                            st.success("✅ تم الحفظ بنجاح")
+                            # تفريغ البيانات من خلال تغيير المفتاح ومسح مدخل البحث
                             st.session_state.form_reset_key += 1
                             time.sleep(1.2)
                             st.rerun()
@@ -183,7 +184,7 @@ if st.session_state['user_type'] == "school":
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                       (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, "", "", "", "", "", c_phone))
                             conn.commit()
-                            st.success("✅ تم حفظ طلب التصحيح بنجاح")
+                            st.success("✅ تم الحفظ بنجاح")
                             st.session_state.form_reset_key += 1
                             time.sleep(1.2)
                             st.rerun()
