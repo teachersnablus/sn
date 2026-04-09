@@ -5,7 +5,7 @@ from io import BytesIO
 import time
 
 # --- 1. إعدادات الصفحة والتنسيق ---
-st.set_page_config(page_title="نظام مديرية جنوب نابلس 2026", layout="wide")
+st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
 
 st.markdown("""
     <style>
@@ -115,7 +115,7 @@ def validate_inputs(id_val, phone_val):
 
 # --- 3. تسجيل الدخول ---
 if not st.session_state['auth']:
-    st.title("🏛️ بوابة مديرية التربية والتعليم - جنوب نابلس")
+    st.title("🏛️ بوابة تجميع المراقبة والتصحيح مديرية التربية والتعليم - جنوب نابلس")
     tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
     with tab1:
         u_in = st.text_input("رقم المدرسة").strip()
