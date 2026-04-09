@@ -152,7 +152,7 @@ if st.session_state['user_type'] == "school":
 
     if menu == "إضافة":
         col_lbl, col_inp = st.columns([1.2, 3])
-        with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية</div>", unsafe_allow_html=True)
+        with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية للتعديل</div>", unsafe_allow_html=True)
         with col_inp: search_id = st.text_input("", placeholder="أدخل رقم الهوية...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
         found_row, is_main = None, False
