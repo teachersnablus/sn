@@ -183,8 +183,8 @@ if st.session_state['user_type'] == "school":
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
                     job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
                     st.divider()
-                    school2 = st.text_input("المدرسة الثانية ان وجدت", value=found_row['school2'] if (found_row is not None and is_main) else "")
-                    rel_name = st.text_input("اسم القريب المباشر", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value=found_row['school2'] if (found_row is not None and is_main) else "")
+                    rel_name = st.text_input("اسم القريب المباشر (إن وجد)", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
@@ -205,8 +205,8 @@ if st.session_state['user_type'] == "school":
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
                     job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
                     st.divider()
-                    school2 = st.text_input("المدرسة الثانية ان وجدت", value=found_row['school2'] if (found_row is not None and is_main) else "")
-                    rel_exam = st.text_input("امتحان القريب المباشر", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value=found_row['school2'] if (found_row is not None and is_main) else "")
+                    rel_exam = st.text_input("امتحان القريب المباشر (إن وجد)", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
