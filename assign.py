@@ -133,7 +133,7 @@ if not st.session_state['auth']:
                 st.error("❌ فشل الاتصال - يرجى المحاولة مرة أخرى")
     with tab2:
         adm_pass = st.text_input("كلمة مرور الإدارة", type="password")
-        if st.button("دخول المسؤول"):
+        if st.button("دخول القسم"):
             if adm_pass == "ADMIN2026":
                 st.session_state.update({'auth': True, 'user_type': "admin"})
                 st.rerun()
