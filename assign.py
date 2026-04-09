@@ -116,7 +116,7 @@ def validate_inputs(id_val, phone_val):
 # --- 3. تسجيل الدخول ---
 if not st.session_state['auth']:
     st.title("🏛️ بوابة تجميع المراقبة والتصحيح مديرية التربية والتعليم - جنوب نابلس")
-    tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول الإدارة"])
+    tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول القسم"])
     with tab1:
         u_in = st.text_input("رقم المدرسة").strip()
         p_in = st.text_input("كلمة المرور", type="password").strip()
