@@ -5,8 +5,9 @@ from io import BytesIO
 import time
 
 # --- 1. إعدادات الصفحة والتنسيق ---
-st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
-# --- إضافة الترويسة الثابتة في أعلى الصفحة بصيغة مطورة ---
+# --- 1. إعدادات الصفحة والتنسيق ---
+st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide", initial_sidebar_state="expanded")
+
 st.markdown("""
     <style>
         /* تثبيت الترويسة ومنعها من الاختفاء */
@@ -19,20 +20,35 @@ st.markdown("""
             color: white;
             text-align: center;
             padding: 15px 0;
-            z-index: 999999; /* رقم عالي جداً لضمان الظهور فوق كل شيء */
+            z-index: 999999;
             border-bottom: 2px solid #00ffcc;
             line-height: 1.5;
             direction: rtl;
             box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
         }
         
-        /* إزاحة محتوى التطبيق لأسفل لكي لا تغطيه الترويسة */
+        /* إخفاء زر فتح وإغلاق القائمة الجانبية لجعلها ثابتة */
+        button[kind="headerNoContext"] {
+            display: none !important;
+        }
+        [data-testid="stSidebarCollapseButton"] {
+            display: none !important;
+        }
+
+        /* إزاحة محتوى التطبيق لأسفل */
         .stApp {
             margin-top: 80px;
         }
 
-        /* إخفاء الهيدر الافتراضي لستريمليت لزيادة المساحة (اختياري) */
         header {visibility: hidden;}
+
+        /* تنسيقات الخط والاتجاه */
+        html, body, [class*="st-"] {
+            font-size: 19px !important;
+            direction: rtl;
+            text-align: right;
+        }
+        .stApp { direction: rtl; text-align: right; }
     </style>
     
     <div class="custom-header">
