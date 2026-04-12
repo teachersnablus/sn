@@ -6,7 +6,40 @@ import time
 
 # --- 1. إعدادات الصفحة والتنسيق ---
 st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
+# --- إضافة الترويسة الثابتة في أعلى الصفحة بصيغة مطورة ---
+st.markdown("""
+    <style>
+        /* تثبيت الترويسة ومنعها من الاختفاء */
+        .custom-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #1a1c23;
+            color: white;
+            text-align: center;
+            padding: 15px 0;
+            z-index: 999999; /* رقم عالي جداً لضمان الظهور فوق كل شيء */
+            border-bottom: 2px solid #00ffcc;
+            line-height: 1.5;
+            direction: rtl;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+        }
+        
+        /* إزاحة محتوى التطبيق لأسفل لكي لا تغطيه الترويسة */
+        .stApp {
+            margin-top: 80px;
+        }
 
+        /* إخفاء الهيدر الافتراضي لستريمليت لزيادة المساحة (اختياري) */
+        header {visibility: hidden;}
+    </style>
+    
+    <div class="custom-header">
+        <div style="font-weight: bold; font-size: 1.2rem;">إعداد وتصميم : عوض نعمان ريده</div>
+        <div style="font-size: 1rem; color: #00ffcc;">قسم الامتحانات مديرية التربية والتعليم جنوب نابلس</div>
+    </div>
+    """, unsafe_allow_html=True)
 st.markdown("""
     <style>
     html, body, [class*="st-"] {
