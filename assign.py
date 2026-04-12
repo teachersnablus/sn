@@ -5,12 +5,11 @@ from io import BytesIO
 import time
 
 # --- 1. إعدادات الصفحة والتنسيق ---
-# --- 1. إعدادات الصفحة والتنسيق ---
-st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
 
 st.markdown("""
     <style>
-        /* تثبيت الترويسة ومنعها من الاختفاء */
+        /* تثبيت الترويسة العلوي */
         .custom-header {
             position: fixed;
             top: 0;
@@ -20,19 +19,16 @@ st.markdown("""
             color: white;
             text-align: center;
             padding: 15px 0;
-            z-index: 999999;
+            z-index: 9999;
             border-bottom: 2px solid #00ffcc;
             line-height: 1.5;
             direction: rtl;
             box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
         }
         
-        /* إخفاء زر فتح وإغلاق القائمة الجانبية لجعلها ثابتة */
-        button[kind="headerNoContext"] {
-            display: none !important;
-        }
-        [data-testid="stSidebarCollapseButton"] {
-            display: none !important;
+        /* إخفاء القائمة الجانبية بالكامل */
+        [data-testid="stSidebar"] {
+            display: none;
         }
 
         /* إزاحة محتوى التطبيق لأسفل */
@@ -49,6 +45,34 @@ st.markdown("""
             text-align: right;
         }
         .stApp { direction: rtl; text-align: right; }
+        
+        div[data-testid="stForm"] { 
+            text-align: right; 
+            border: 1px solid #ddd; 
+            padding: 25px; 
+            border-radius: 12px; 
+        }
+        
+        .school-title { 
+            color: #ffffff; 
+            background-color: #1E3A8A; 
+            padding: 20px; 
+            border-radius: 10px; 
+            text-align: center; 
+            font-size: 26px !important; 
+            font-weight: bold; 
+            margin-top: 20px;
+            margin-bottom: 20px; 
+        }
+        .search-row-label {
+            font-size: 20px !important;
+            font-weight: bold;
+            color: #ffffff; 
+            background-color: #1E3A8A; 
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
     </style>
     
     <div class="custom-header">
@@ -56,54 +80,10 @@ st.markdown("""
         <div style="font-size: 1rem; color: #00ffcc;">قسم الامتحانات - مديرية التربية والتعليم جنوب نابلس</div>
     </div>
     """, unsafe_allow_html=True)
-st.markdown("""
-    <style>
-    html, body, [class*="st-"] {
-        font-size: 19px !important;
-        direction: rtl;
-        text-align: right;
-    }
-    .stApp { direction: rtl; text-align: right; }
-    div[data-testid="stForm"] { 
-        text-align: right; 
-        border: 1px solid #ddd; 
-        padding: 25px; 
-        border-radius: 12px; 
-    }
-    input, select, textarea { 
-        font-size: 19px !important;
-        direction: rtl !important; 
-        text-align: right !important; 
-    }
-    .school-title { 
-        color: #ffffff; 
-        background-color: #1E3A8A; 
-        padding: 25px; 
-        border-radius: 10px; 
-        text-align: center; 
-        font-size: 28px !important; 
-        font-weight: bold; 
-        margin-bottom: 30px; 
-    }
-    .search-row-label {
-        font-size: 22px !important;
-        font-weight: bold;
-        color: #ffffff; 
-        background-color: #1E3A8A; 
-        padding: 10px 15px;
-        border-radius: 8px;
-        white-space: nowrap;
-        text-align: center;
-    }
-    .stButton button { font-size: 19px !important; }
-    .stTabs [data-baseweb="tab"] { font-size: 21px !important; }
-    </style>
-    """, unsafe_allow_html=True)
 
 SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
 
-# --- تعديل الصيانة: دالة جلب الحسابات مع التخزين المؤقت لمنع فشل الاتصال ---
-@st.cache_data(ttl=600)  # تخزين البيانات لمدة 10 دقائق لتسريع الدخول
+@st.cache_data(ttl=600)
 def load_accounts():
     try:
         return pd.read_csv(SCHOOLS_ACCOUNTS_URL)
@@ -116,20 +96,19 @@ c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, 
-              phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, 
-              desire TEXT, principal_note TEXT, type TEXT)''')
+             phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, 
+             desire TEXT, principal_note TEXT, type TEXT)''')
 
 c.execute('''CREATE TABLE IF NOT EXISTS correction_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_user TEXT, school_full_name TEXT, 
-              subject TEXT, branch TEXT, address TEXT, 
-              has_relative TEXT, relative_details TEXT, phone TEXT)''')
+             subject TEXT, branch TEXT, address TEXT, 
+             has_relative TEXT, relative_details TEXT, phone TEXT)''')
 
 c.execute('''CREATE TABLE IF NOT EXISTS system_settings (form_name TEXT PRIMARY KEY, is_open INTEGER)''')
 for form in ['ثانوية', 'توظيف', 'تصحيح']:
     c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
 
-# --- دالة تصدير الإكسل ---
 def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -145,19 +124,18 @@ def to_excel(df):
     return output.getvalue()
 
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
-if 'auth' not in st.session_state: st.session_state.update({'auth': False, 'school_display_name': "", 'school_user': "", 'user_type': ""})
+if 'auth' not in st.session_state: st.session_state.update({'auth': False, 'school_display_name': "", 'school_user': "", 'user_type': "", 'menu_choice': "إضافة"})
 
 def get_form_status(form_name):
     c.execute("SELECT is_open FROM system_settings WHERE form_name=?", (form_name,))
     res = c.fetchone()
     return res[0] == 1 if res else True
 
-# --- دالة التحقق من الأرقام ---
-def validate_inputs(id_val, phone_val):
-    if len(id_val) != 9 or not id_val.isdigit():
+def validate_inputs(id_num, phone):
+    if len(id_num) != 9 or not id_num.isdigit():
         st.error("❌ خطأ: رقم الهوية يجب أن يتكون من 9 أرقام بالضبط.")
         return False
-    if len(phone_val) != 10 or not phone_val.isdigit():
+    if len(phone) != 10 or not phone.isdigit():
         st.error("❌ خطأ: رقم الجوال يجب أن يتكون من 10 أرقام بالضبط.")
         return False
     return True
@@ -170,7 +148,6 @@ if not st.session_state['auth']:
         u_in = st.text_input("رقم المدرسة").strip()
         p_in = st.text_input("كلمة المرور", type="password").strip()
         if st.button("دخول المدارس"):
-            # استخدام الدالة الجديدة التي تدعم التخزين المؤقت
             df_acc = load_accounts()
             if df_acc is not None:
                 match = df_acc[(df_acc['school_user'].astype(str) == u_in) & (df_acc['password'].astype(str) == p_in)]
@@ -178,28 +155,34 @@ if not st.session_state['auth']:
                     st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
                     st.rerun()
                 else: st.error("❌ بيانات الحساب خاطئة")
-            else: 
-                st.error("❌ فشل الاتصال - يرجى المحاولة مرة أخرى")
+            else: st.error("❌ فشل الاتصال - يرجى المحاولة مرة أخرى")
     with tab2:
         adm_pass = st.text_input("كلمة مرور القسم", type="password")
         if st.button("دخول القسم"):
             if adm_pass == "ADMIN2026":
-                st.session_state.update({'auth': True, 'user_type': "admin"})
+                st.session_state.update({'auth': True, 'user_type': "admin", 'menu_choice': "إدارة البيانات"})
                 st.rerun()
             else: st.error("❌ كلمة المرور غير صحيحة")
     st.stop()
 
-# --- باقي الكود كما هو دون أي تغيير نهائياً ---
+# --- شاشة المدارس ---
 if st.session_state['user_type'] == "school":
-    st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
-    menu = st.sidebar.radio("القائمة الرئيسية:", ["إضافة", "التقارير"])
-    st.sidebar.markdown("<br>"*22, unsafe_allow_html=True)
-    col_out1, col_out2, col_out3 = st.sidebar.columns([0.5, 2, 0.5])
-    with col_out2:
-        if st.button("🚪 تسجيل الخروج"):
-            st.session_state.clear(); st.rerun()
+    # أزرار التنقل العلوية
+    nav1, nav2, nav3, nav4 = st.columns([1, 1, 2, 1])
+    with nav1:
+        if st.button("➕ إضافة بيانات", use_container_width=True):
+            st.session_state.menu_choice = "إضافة"
+    with nav2:
+        if st.button("📊 التقارير", use_container_width=True):
+            st.session_state.menu_choice = "التقارير"
+    with nav4:
+        if st.button("🚪 تسجيل الخروج", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
 
-    if menu == "إضافة":
+    st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
+
+    if st.session_state.menu_choice == "إضافة":
         col_lbl, col_inp = st.columns([1.2, 3])
         with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية للتعديل</div>", unsafe_allow_html=True)
         with col_inp: search_id = st.text_input("", placeholder="أدخل رقم الهوية...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
@@ -237,8 +220,7 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
-                        if not (name and id_num and phone and address and job): 
-                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
@@ -259,8 +241,7 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        if not (name and id_num and phone and address and job): 
-                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
                             c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
@@ -275,40 +256,50 @@ if st.session_state['user_type'] == "school":
                     c_address = c2.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and not is_main) else "")
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
                     c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
-                    
                     sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص",  "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
-                    
                     st.divider()
                     has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
-                            st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
                         elif validate_inputs(c_id, c_phone):
                             c.execute("INSERT OR REPLACE INTO correction_table VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
-    elif menu == "التقارير":
+    elif st.session_state.menu_choice == "التقارير":
         st.subheader("📊 سجلات المدرسة الموثقة")
         df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
         df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
         if not df1.empty: st.info("🔹 كشف المراقبة والتوظيف"); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
         if not df2.empty: st.divider(); st.success("🔹 كشف التصحيح"); st.dataframe(df2[['id_num','name','address','branch','subject']], use_container_width=True)
 
+# --- شاشة الإدارة ---
 elif st.session_state['user_type'] == "admin":
-    adm_menu = st.sidebar.radio("لوحة التحكم:", ["إدارة البيانات", "صلاحيات النماذج"])
-    st.sidebar.markdown("<br>"*22, unsafe_allow_html=True)
-    with st.sidebar:
-        if st.button("🚪 تسجيل الخروج"): st.session_state.clear(); st.rerun()
+    # أزرار التنقل العلوية للقسم
+    adm_nav1, adm_nav2, adm_nav3, adm_nav4 = st.columns([1, 1, 2, 1])
+    with adm_nav1:
+        if st.button("📂 إدارة البيانات", use_container_width=True):
+            st.session_state.menu_choice = "إدارة البيانات"
+    with adm_nav2:
+        if st.button("⚙️ صلاحيات النماذج", use_container_width=True):
+            st.session_state.menu_choice = "صلاحيات النماذج"
+    with adm_nav4:
+        if st.button("🚪 تسجيل الخروج", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
 
     st.title("🛠️ لوحة تحكم الإدارة المركزية")
-    if adm_menu == "صلاحيات النماذج":
+    
+    if st.session_state.menu_choice == "صلاحيات النماذج":
         cols = st.columns(3)
         for i, f in enumerate(['ثانوية', 'توظيف', 'تصحيح']):
             with cols[i]:
                 curr = get_form_status(f); st.write(f"نموذج {f}: {'✅ مفتوح' if curr else '❌ مغلق'}")
-                if st.button(f"تغيير حالة {f}", key=f"at_{f}"): c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f)); conn.commit(); st.rerun()
+                if st.button(f"تغيير حالة {f}", key=f"at_{f}"): 
+                    c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f))
+                    conn.commit()
+                    st.rerun()
     else:
         t1, t2, t3 = st.tabs(["الثانوية العامة", "امتحان التوظيف", "التصحيح"])
         def view_admin(t_name, d_type, k_s, is_c=False):
