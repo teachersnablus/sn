@@ -88,16 +88,28 @@ def load_accounts():
     try:
         return pd.read_csv(SCHOOLS_ACCOUNTS_URL)
     except:
-        return None
+        return pd.DataFrame(columns=['school_user', 'password', 'school_full_name'])
+
+# --- قائمة المناطق السكنية ---
+RESIDENCE_AREAS = [
+    "", "نابلس", "رام الله", "سلفيت", "طولكرم", "عورتا", "أودلا", "بيتا", "عقربا", 
+    "مجدل بني فاضل", "دوما", "قريوت", "جالود", "تلفيت", "قصرة", "جوريش", "قبلان", 
+    "يتما", "اللبن", "الساوية", "جماعين", "زيتا", "عوريف", "عصيرة القبلية", "بورين", 
+    "مادما", "حوارة", "يانون", "أوصرين"
+]
+
+# --- خيارات الجنس ---
+GENDER_OPTIONS = ["", "ذكر", "أنثى"]
 
 # --- 2. قاعدة البيانات ---
 conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
 
+# تحديث جدول main_table لإضافة عمود الجنس
 c.execute('''CREATE TABLE IF NOT EXISTS main_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, 
              phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, 
-             desire TEXT, principal_note TEXT, type TEXT)''')
+             desire TEXT, principal_note TEXT, type TEXT, gender TEXT)''')
 
 c.execute('''CREATE TABLE IF NOT EXISTS correction_table 
              (id_num TEXT PRIMARY KEY, name TEXT, school_user TEXT, school_full_name TEXT, 
@@ -140,6 +152,12 @@ def validate_inputs(id_num, phone):
         return False
     return True
 
+def get_index_safe(options_list, value):
+    """دالة مساعدة لإيجاد الفهرس بأمان في القوائم المنسدلة"""
+    if value in options_list:
+        return options_list.index(value)
+    return 0
+
 # --- 3. تسجيل الدخول ---
 if not st.session_state['auth']:
     st.title("🏛️ بوابة تجميع المراقبة والتصحيح مديرية التربية والتعليم - جنوب نابلس")
@@ -149,7 +167,7 @@ if not st.session_state['auth']:
         p_in = st.text_input("كلمة المرور", type="password").strip()
         if st.button("دخول المدارس"):
             df_acc = load_accounts()
-            if df_acc is not None:
+            if df_acc is not None and not df_acc.empty:
                 match = df_acc[(df_acc['school_user'].astype(str) == u_in) & (df_acc['password'].astype(str) == p_in)]
                 if not match.empty:
                     st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
@@ -189,10 +207,10 @@ if st.session_state['user_type'] == "school":
         
         found_row, is_main = None, False
         if search_id:
-            df_m = pd.read_sql(f"SELECT * FROM main_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
+            df_m = pd.read_sql_query("SELECT * FROM main_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
             if not df_m.empty: found_row, is_main = df_m.iloc[0], True; st.success(f"✅ الموظف: {found_row['name']}")
             else:
-                df_c = pd.read_sql(f"SELECT * FROM correction_table WHERE id_num='{search_id}' AND school_user='{st.session_state['school_user']}'", conn)
+                df_c = pd.read_sql_query("SELECT * FROM correction_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
                 if not df_c.empty: found_row, is_main = df_c.iloc[0], False; st.success(f"✅ كشف التصحيح: {found_row['name']}")
                 else: st.info("ℹ️ الرقم متاح للتسجيل.")
 
@@ -204,60 +222,90 @@ if st.session_state['user_type'] == "school":
         st.divider()
         t_sec, t_job, t_cor = st.tabs(["📝 الثانوية العامة", "📋 امتحان التوظيف", "✍️ التصحيح"])
         
+        # ==================== تبويب الثانوية العامة ====================
         with t_sec:
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "")
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
                     phone = c1.text_input("رقم الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
-                    address = st.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
+                    
+                    # ✅ مكان السكن - قائمة منسدلة
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, 
+                                         index=get_index_safe(RESIDENCE_AREAS, found_row['address'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else ""))
+                    
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
-                    job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
+                    job = c1.selectbox("الوظيفة *", job_list, 
+                                     index=get_index_safe(job_list, found_row['job_title'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else ""))
+                    
+                    # ✅ حقل الجنس - جديد
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS,
+                                        index=get_index_safe(GENDER_OPTIONS, found_row['gender'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة" and 'gender' in found_row) else ""))
+                    
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value=found_row['school2'] if (found_row is not None and is_main) else "")
                     rel_name = st.text_input("اسم القريب المباشر (إن وجد)", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="الثانوية العامة") else "")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
+                    
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
-                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
-                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_name, job, desire, note, "الثانوية العامة"))
+                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", 
+                                    (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], 
+                                     school2, phone, address, rel_name, job, desire, note, "الثانوية العامة", gender))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
+        # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
                 with st.form(key=f"job_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "")
                     name = c1.text_input("الاسم رباعي *", value=found_row['name'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
                     phone = c1.text_input("رقم الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
-                    address = st.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
+                    
+                    # ✅ مكان السكن - قائمة منسدلة
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS,
+                                         index=get_index_safe(RESIDENCE_AREAS, found_row['address'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else ""))
+                    
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
-                    job = c2.selectbox("الوظيفة *", job_list, index=job_list.index(found_row['job_title']) if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0)
+                    job = c1.selectbox("الوظيفة *", job_list,
+                                     index=get_index_safe(job_list, found_row['job_title'] if (found_row is not None and is_main and found_row['job_title'] in job_list) else 0))
+                    
+                    # ✅ حقل الجنس - جديد
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS,
+                                        index=get_index_safe(GENDER_OPTIONS, found_row['gender'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف" and 'gender' in found_row) else ""))
+                    
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value=found_row['school2'] if (found_row is not None and is_main) else "")
                     rel_exam = st.text_input("امتحان القريب المباشر (إن وجد)", value=found_row['relative_exam'] if (found_row is not None and is_main and found_row['type']=="امتحان التوظيف") else "")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
+                    
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        if not (name and id_num and phone and address and job): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
-                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف"))
+                            c.execute("INSERT OR REPLACE INTO main_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                    (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'],
+                                     school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
                             conn.commit(); st.success("✅ تم الحفظ"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
 
+        # ==================== تبويب التصحيح (بدون تعديل) ====================
         with t_cor:
             if get_form_status('تصحيح'):
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id)
+                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "")
                     c_name = c1.text_input("الاسم الرباعي *", value=found_row['name'] if (found_row is not None and not is_main) else "")
                     c_phone = c1.text_input("الجوال (10 أرقام) *", value=found_row['phone'] if (found_row is not None and not is_main) else "")
-                    c_address = c2.text_input("مكان السكن *", value=found_row['address'] if (found_row is not None and not is_main) else "")
+                    c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS,
+                                           index=get_index_safe(RESIDENCE_AREAS, found_row['address'] if (found_row is not None and not is_main) else ""))
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
-                    c_branch = c1.selectbox("الفرع *", branch_list, index=branch_list.index(found_row['branch']) if (found_row is not None and not is_main and found_row['branch'] in branch_list) else 0)
+                    c_branch = c1.selectbox("الفرع *", branch_list, index=get_index_safe(branch_list, found_row['branch'] if (found_row is not None and not is_main) else ""))
                     sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص",  "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
-                    c_subj = c2.selectbox("المبحث *", sub_list, index=sub_list.index(found_row['subject']) if (found_row is not None and not is_main and found_row['subject'] in sub_list) else 0)
+                    c_subj = c2.selectbox("المبحث *", sub_list, index=get_index_safe(sub_list, found_row['subject'] if (found_row is not None and not is_main) else ""))
                     st.divider()
                     has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True)
                     rel_details = st.text_input("اسم القريب (إن وجد)", value=found_row['relative_details'] if (found_row is not None and not is_main) else "")
@@ -269,8 +317,8 @@ if st.session_state['user_type'] == "school":
 
     elif st.session_state.menu_choice == "التقارير":
         st.subheader("📊 سجلات المدرسة الموثقة")
-        df1 = pd.read_sql(f"SELECT * FROM main_table WHERE school_user='{st.session_state['school_user']}'", conn)
-        df2 = pd.read_sql(f"SELECT * FROM correction_table WHERE school_user='{st.session_state['school_user']}'", conn)
+        df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
+        df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
         if not df1.empty: st.info("🔹 كشف المراقبة والتوظيف"); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
         if not df2.empty: st.divider(); st.success("🔹 كشف التصحيح"); st.dataframe(df2[['id_num','name','address','branch','subject']], use_container_width=True)
 
@@ -303,8 +351,8 @@ elif st.session_state['user_type'] == "admin":
     else:
         t1, t2, t3 = st.tabs(["الثانوية العامة", "امتحان التوظيف", "التصحيح"])
         def view_admin(t_name, d_type, k_s, is_c=False):
-            df = pd.read_sql("SELECT * FROM correction_table", conn) if is_c else pd.read_sql(f"SELECT * FROM main_table WHERE type='{d_type}'", conn)
-            sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].unique().tolist()), key=f"s_{k_s}")
+            df = pd.read_sql_query("SELECT * FROM correction_table", conn) if is_c else pd.read_sql_query("SELECT * FROM main_table WHERE type=?", conn, params=(d_type,))
+            sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             st.dataframe(f_df)
             st.download_button(label=f"📥 تحميل ({t_name})", data=to_excel(f_df), file_name=f'admin_{k_s}.xlsx')
