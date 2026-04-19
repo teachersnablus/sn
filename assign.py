@@ -199,46 +199,48 @@ if st.session_state['user_type'] == "school":
                             except Exception as e: st.error(f"❌ خطأ: {str(e)}")
 
         # ==================== تبويب امتحان التوظيف ====================
+        # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
-                with st.form(key=f"job_form_main_{st.session_state.reset_key}"):
-                    c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
-                    name = c1.text_input("الاسم رباعي *", value="", key=f"job_name_{st.session_state.reset_key}")
-                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key=f"job_phone_{st.session_state.reset_key}")
-                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"job_addr_{st.session_state.reset_key}")
-                    job = c1.selectbox("الوظيفة *", ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"], index=0, key=f"job_title_sel_{st.session_state.reset_key}")
-                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"job_gender_{st.session_state.reset_key}")
-                    
-                    st.divider()
-                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
-                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
-                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
-                    
-                    # --- هذا هو الجزء الذي سألت عنه ---
-                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_radio_{st.session_state.reset_key}")
-                    
-                    # سيظهر هذا الحقل فوراً بمجرد اختيار "يوجد"
-                    rel_exam = ""
-                    if has_rel == "يوجد":
-                        rel_exam = st.text_input("اسم القريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
-                    # ---------------------------------
-
-                    if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        if not (name and id_num and phone and address and job and gender): 
-                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
-                        elif has_rel == "يوجد" and not rel_exam: 
-                            st.error("⚠️ يرجى إدخال اسم القريب المباشر")
-                        elif validate_inputs(id_num, phone):
-                            try:
-                                c.execute("""INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                        (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
-                                conn.commit()
-                                st.success("✅ تم الحفظ بنجاح")
-                                st.session_state.reset_key += 1
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as e: st.error(f"❌ خطأ: {str(e)}")
+                # ملاحظة: أزلنا الـ form هنا لجعل الراديو تفاعلياً لحظياً
+                c1, c2 = st.columns(2)
+                id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
+                name = c1.text_input("الاسم رباعي *", value="", key=f"job_name_{st.session_state.reset_key}")
+                phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key=f"job_phone_{st.session_state.reset_key}")
+                address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"job_addr_{st.session_state.reset_key}")
+                job = c1.selectbox("الوظيفة *", ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"], index=0, key=f"job_title_sel_{st.session_state.reset_key}")
+                gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"job_gender_{st.session_state.reset_key}")
+                
+                st.divider()
+                school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
+                desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
+                note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
+                
+                # الراديو الآن خارج فورم، سيعمل التحديث فور الضغط
+                has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_radio_{st.session_state.reset_key}")
+                
+                rel_exam = ""
+                if has_rel == "يوجد":
+                    # سيظهر هذا المستطيل فقط عند اختيار "يوجد" ويختفي عند "لا يوجد"
+                    rel_exam = st.text_input("اسم القريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
+        
+                st.divider()
+                # استخدام زر عادي بدلاً من زر الفورم
+                if st.button("💾 حفظ بيانات التوظيف", key=f"save_btn_job_{st.session_state.reset_key}"):
+                    if not (name and id_num and phone and address and job and gender): 
+                        st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                    elif has_rel == "يوجد" and not rel_exam: 
+                        st.error("⚠️ يرجى إدخال اسم القريب المباشر")
+                    elif validate_inputs(id_num, phone):
+                        try:
+                            c.execute("""INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                    (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
+                            conn.commit()
+                            st.success("✅ تم الحفظ بنجاح")
+                            st.session_state.reset_key += 1
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e: st.error(f"❌ خطأ: {str(e)}")
         # ==================== تبويب التصحيح ====================
         with t_cor:
             if get_form_status('تصحيح'):
