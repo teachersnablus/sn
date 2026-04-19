@@ -73,6 +73,16 @@ st.markdown("""
             border-radius: 8px;
             text-align: center;
         }
+        .note-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+        }
     </style>
     
     <div class="custom-header">
@@ -196,7 +206,7 @@ if not st.session_state['auth']:
             
             if admin_submitted:
                 if adm_pass == "ADMIN2026":
-                    st.session_state.update({'auth': True, 'user_type': "admin", 'menu_choice': "إدارة البيانات"})
+                    st.session_state.update({'auth': True, 'user_type': "admin', 'menu_choice': "إدارة البيانات"})
                     st.rerun()
                 else: st.error("❌ كلمة المرور غير صحيحة")
     st.stop()
@@ -252,6 +262,9 @@ if st.session_state['user_type'] == "school":
         with t_sec:
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
+                    # ✅ الملاحظة تظهر في أعلى النموذج فوق رقم الهوية
+                    st.markdown('<div class="note-box">📋 ملاحظة هامة: تعبأ بيانات المعلم الذي ليس له قريب مباشر فقط</div>', unsafe_allow_html=True)
+                    
                     c1, c2 = st.columns(2)
                     id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"sec_id_{st.session_state.reset_key}")
                     name = c1.text_input("الاسم رباعي *", value="", key=f"sec_name_{st.session_state.reset_key}")
@@ -264,9 +277,6 @@ if st.session_state['user_type'] == "school":
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"sec_school2_{st.session_state.reset_key}")
                     
-                    # ✅ ملاحظة: تعبئة بيانات المعلم الذي ليس له قريب مباشر فقط
-                    st.warning("📋 ملاحظة: تعبأ بيانات المعلم الذي ليس له قريب مباشر فقط")
-                    
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"desire_sec_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"note_sec_{st.session_state.reset_key}")
                     
@@ -275,7 +285,7 @@ if st.session_state['user_type'] == "school":
                             st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
                             try:
-                                # ✅ في الثانوية: relative_exam يُحفظ فارغ دائماً
+                                # ✅ في الثانوية: relative_exam يُحفظ فارغ دائماً (لا نأخذ بيانات من له قريب)
                                 c.execute("""INSERT INTO main_table 
                                             (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) 
                                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", 
@@ -310,7 +320,7 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
                     
-                    # ✅ التعديل: خيار القريب المباشر يظهر تحت الرغبة ورأي المدير
+                    # ✅ خيار القريب المباشر يظهر بعد الرغبة ورأي المدير
                     st.session_state.has_rel_job = st.radio(
                         "هل له قريب مباشر يتقدم للامتحان؟", 
                         ["لا يوجد", "يوجد"], 
@@ -363,17 +373,34 @@ if st.session_state['user_type'] == "school":
                     c_subj = c2.selectbox("المبحث *", sub_list, index=0, key=f"cor_subj_{st.session_state.reset_key}")
                     st.divider()
                     
+                    # ✅ إعادة زر القريب المباشر في التصحيح (كان محذوف بالخطأ)
+                    st.session_state.has_rel_cor = st.radio(
+                        "هل له قريب مباشر يتقدم للامتحان؟", 
+                        ["لا يوجد", "يوجد"], 
+                        horizontal=True, 
+                        key=f"rel_cor_{st.session_state.reset_key}",
+                        index=0 if st.session_state.has_rel_cor == "لا يوجد" else 1
+                    )
+                    
+                    # ✅ إظهار حقل القريب في التصحيح بناءً على قيمة الجلسة
+                    if st.session_state.has_rel_cor == "يوجد":
+                        rel_details = st.text_input("اسم القريب *", value="", key=f"rel_det_cor_{st.session_state.reset_key}")
+                    else:
+                        rel_details = ""
+                    
                     if st.form_submit_button("💾 حفظ بيانات التصحيح"):
                         if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
                             st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                        elif st.session_state.has_rel_cor == "يوجد" and not rel_details:
+                            st.error("⚠️ يرجى إدخال اسم القريب المباشر")
                         elif validate_inputs(c_id, c_phone):
                             try:
-                                # ✅ في التصحيح: has_relative و relative_details يُحفظان كما هما
+                                rel_details_safe = rel_details if rel_details else ""
                                 c.execute("""INSERT INTO correction_table 
                                             (id_num, name, school_user, school_full_name, subject, branch, address, has_relative, relative_details, phone) 
                                             VALUES (?,?,?,?,?,?,?,?,?,?)""", 
                                         (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], 
-                                         c_subj, c_branch, c_address, "لا يوجد", "", c_phone))
+                                         c_subj, c_branch, c_address, st.session_state.has_rel_cor, rel_details_safe, c_phone))
                                 conn.commit()
                                 st.success("✅ تم الحفظ بنجاح")
                                 st.session_state.reset_key += 1
@@ -482,4 +509,3 @@ elif st.session_state['user_type'] == "admin":
         with t1: view_admin("الثانوية العامة", "الثانوية العامة", "tw")
         with t2: view_admin("امتحان التوظيف", "امتحان التوظيف", "em")
         with t3: view_admin("تصحيح", "", "cr", True)
-            
