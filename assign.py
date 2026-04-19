@@ -201,7 +201,6 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
-                # دمج كل شيء داخل فورم واحد
                 with st.form(key=f"job_form_main_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
@@ -210,21 +209,22 @@ if st.session_state['user_type'] == "school":
                     address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"job_addr_{st.session_state.reset_key}")
                     job = c1.selectbox("الوظيفة *", ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"], index=0, key=f"job_title_sel_{st.session_state.reset_key}")
                     gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"job_gender_{st.session_state.reset_key}")
+                    
                     st.divider()
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
                     
-                    # حقل القريب داخل الفورم
+                    # --- هذا هو الجزء الذي سألت عنه ---
                     has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_radio_{st.session_state.reset_key}")
+                    
+                    # سيظهر هذا الحقل فوراً بمجرد اختيار "يوجد"
                     rel_exam = ""
                     if has_rel == "يوجد":
                         rel_exam = st.text_input("اسم القريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
-        
-                    # زر الإرسال داخل نفس الفورم
-                    submit_job = st.form_submit_button("💾 حفظ بيانات التوظيف")
-                    
-                    if submit_job:
+                    # ---------------------------------
+
+                    if st.form_submit_button("💾 حفظ بيانات التوظيف"):
                         if not (name and id_num and phone and address and job and gender): 
                             st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif has_rel == "يوجد" and not rel_exam: 
