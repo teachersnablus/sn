@@ -201,7 +201,8 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
-                with st.form(key=f"job_form_{st.session_state.reset_key}"):
+                # دمج كل شيء داخل فورم واحد
+                with st.form(key=f"job_form_main_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
                     name = c1.text_input("الاسم رباعي *", value="", key=f"job_name_{st.session_state.reset_key}")
@@ -213,28 +214,35 @@ if st.session_state['user_type'] == "school":
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
-                
-                # ✅ خارج الفورم لكن في الموقع المطلوب (تحت الرغبة ورأي المدير)
-                st.session_state.has_rel_job = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_{st.session_state.reset_key}", index=0 if st.session_state.has_rel_job == "لا يوجد" else 1)
-                if st.session_state.has_rel_job == "يوجد":
-                    rel_exam = st.text_input("اسم القريب المباشر *", value="", key=f"rel_exam_job_{st.session_state.reset_key}")
-                else: rel_exam = ""
-                
-                with st.form(key=f"job_submit_{st.session_state.reset_key}"):
-                    if st.form_submit_button("💾 حفظ بيانات التوظيف"):
-                        if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
-                        elif st.session_state.has_rel_job == "يوجد" and not rel_exam: st.error("⚠️ يرجى إدخال اسم القريب المباشر")
+                    
+                    # حقل القريب داخل الفورم
+                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_radio_{st.session_state.reset_key}")
+                    rel_exam = ""
+                    if has_rel == "يوجد":
+                        rel_exam = st.text_input("اسم القريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
+        
+                    # زر الإرسال داخل نفس الفورم
+                    submit_job = st.form_submit_button("💾 حفظ بيانات التوظيف")
+                    
+                    if submit_job:
+                        if not (name and id_num and phone and address and job and gender): 
+                            st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        elif has_rel == "يوجد" and not rel_exam: 
+                            st.error("⚠️ يرجى إدخال اسم القريب المباشر")
                         elif validate_inputs(id_num, phone):
                             try:
                                 c.execute("""INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                        (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam if rel_exam else "", job, desire, note, "امتحان التوظيف", gender))
-                                conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                                        (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
+                                conn.commit()
+                                st.success("✅ تم الحفظ بنجاح")
+                                st.session_state.reset_key += 1
+                                time.sleep(1)
+                                st.rerun()
                             except Exception as e: st.error(f"❌ خطأ: {str(e)}")
-
         # ==================== تبويب التصحيح ====================
         with t_cor:
             if get_form_status('تصحيح'):
-                with st.form(key=f"c_form_{st.session_state.reset_key}"):
+                with st.form(key=f"cor_form_main_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"cor_id_{st.session_state.reset_key}")
                     c_name = c1.text_input("الاسم الرباعي *", value="", key=f"cor_name_{st.session_state.reset_key}")
@@ -242,22 +250,31 @@ if st.session_state['user_type'] == "school":
                     c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"cor_addr_{st.session_state.reset_key}")
                     c_branch = c1.selectbox("الفرع *", ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"], index=0, key=f"cor_branch_{st.session_state.reset_key}")
                     c_subj = c2.selectbox("المبحث *", ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص", "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"], index=0, key=f"cor_subj_{st.session_state.reset_key}")
-                
-                # ✅ خارج الفورم لكن في الموقع المطلوب (تحت الفرع والمبحث)
-                st.session_state.has_rel_cor = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_cor_{st.session_state.reset_key}", index=0 if st.session_state.has_rel_cor == "لا يوجد" else 1)
-                if st.session_state.has_rel_cor == "يوجد":
-                    rel_details = st.text_input("اسم القريب *", value="", key=f"rel_det_cor_{st.session_state.reset_key}")
-                else: rel_details = ""
-                
-                with st.form(key=f"cor_submit_{st.session_state.reset_key}"):
-                    if st.form_submit_button("💾 حفظ بيانات التصحيح"):
-                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
-                        elif st.session_state.has_rel_cor == "يوجد" and not rel_details: st.error("⚠️ يرجى إدخال اسم القريب المباشر")
+                    
+                    st.divider()
+                    # حقل القريب داخل الفورم
+                    has_rel_cor = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_cor_radio_{st.session_state.reset_key}")
+                    rel_details = ""
+                    if has_rel_cor == "يوجد":
+                        rel_details = st.text_input("اسم القريب *", key=f"rel_det_input_{st.session_state.reset_key}")
+        
+                    # زر الإرسال داخل نفس الفورم
+                    submit_cor = st.form_submit_button("💾 حفظ بيانات التصحيح")
+        
+                    if submit_cor:
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
+                            st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                        elif has_rel_cor == "يوجد" and not rel_details: 
+                            st.error("⚠️ يرجى إدخال اسم القريب المباشر")
                         elif validate_inputs(c_id, c_phone):
                             try:
                                 c.execute("""INSERT INTO correction_table (id_num, name, school_user, school_full_name, subject, branch, address, has_relative, relative_details, phone) VALUES (?,?,?,?,?,?,?,?,?,?)""", 
-                                        (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, st.session_state.has_rel_cor, rel_details if rel_details else "", c_phone))
-                                conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                                        (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel_cor, rel_details, c_phone))
+                                conn.commit()
+                                st.success("✅ تم الحفظ بنجاح")
+                                st.session_state.reset_key += 1
+                                time.sleep(1)
+                                st.rerun()
                             except Exception as e: st.error(f"❌ خطأ: {str(e)}")
 
     elif st.session_state.menu_choice == "التقارير":
