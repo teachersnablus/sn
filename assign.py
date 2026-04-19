@@ -4,6 +4,29 @@ import sqlite3
 from io import BytesIO
 import time
 
+
+# قاموس ترجمة الأعمدة
+COLUMN_NAMES_MAP = {
+    'id': 'المسلسل',
+    'id_num': 'رقم الهوية',
+    'name': 'الاسم رباعي',
+    'school_user': 'رقم المدرسة',
+    'school_full_name': 'اسم المدرسة',
+    'school2': 'المدرسة الثانية',
+    'phone': 'رقم الجوال',
+    'address': 'مكان السكن',
+    'relative_exam': 'اسم القريب المباشر',
+    'job_title': 'الوظيفة',
+    'desire': 'الرغبة',
+    'principal_note': 'رأي المدير',
+    'type': 'نوع النظام',
+    'gender': 'الجنس',
+    'subject': 'المبحث',
+    'branch': 'الفرع',
+    'has_relative': 'هل يوجد قريب؟',
+    'relative_details': 'تفاصيل القريب'
+}
+
 # --- 1. إعدادات الصفحة والتنسيق ---
 st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
 
@@ -291,13 +314,21 @@ if st.session_state['user_type'] == "school":
             df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
             if report_type == "الثانوية العامة": df1 = df1[df1['type'] == "الثانوية العامة"]
             elif report_type == "امتحان التوظيف": df1 = df1[df1['type'] == "امتحان التوظيف"]
-            if not df1.empty: st.info("🔹 كشف المراقبة "); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
+            
+            if not df1.empty: 
+                st.info("🔹 كشف المراقبة والتوظيف")
+                # تعديل الأسماء هنا
+                display_df1 = df1.drop(columns=['school_user','school_full_name']).rename(columns=COLUMN_NAMES_MAP)
+                st.dataframe(display_df1, use_container_width=True)
         
         if report_type in ["الكل", "التصحيح"]:
             df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
             if not df2.empty: 
                 if report_type != "الكل": st.divider()
-                st.success("🔹 كشف التصحيح"); st.dataframe(df2[['id_num','name','address','branch','subject']], use_container_width=True)
+                st.success("🔹 كشف التصحيح")
+                # تعديل الأسماء هنا
+                display_df2 = df2.rename(columns=COLUMN_NAMES_MAP)
+                st.dataframe(display_df2, use_container_width=True)
 
 # --- شاشة الإدارة ---
 elif st.session_state['user_type'] == "admin":
@@ -330,7 +361,10 @@ elif st.session_state['user_type'] == "admin":
             sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}_{st.session_state.reset_key}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             if not f_df.empty:
-                st.dataframe(f_df, use_container_width=True)
+                # تعديل الأسماء قبل العرض
+                st.dataframe(f_df.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
+                
+                # ... (باقي كود الحذف والتحميل) ...
                 st.write("🗑️ **لحذف سجل محدد يدوياً:**")
                 col_del1, col_del2, col_del3 = st.columns([3, 3, 1])
                 with col_del1: del_id = st.text_input("رقم الهوية:", key=f"del_id_{k_s}_{st.session_state.reset_key}")
