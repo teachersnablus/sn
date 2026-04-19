@@ -100,41 +100,43 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
         
-        # ✅ حجم 14 هو الأمثل للطباعة العربية الواضحة مع الجداول العريضة
+        # ✅ إزالة text_wrap لضمان سطر واحد داخل الخلية
         cell_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'border': 1,
-            'align': 'center', 'valign': 'vcenter', 'text_wrap': True
+            'font_size': 13, 'font_name': 'Arial', 'border': 1,
+            'align': 'center', 'valign': 'vcenter', 'text_wrap': False
         })
         header_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'bold': True, 'border': 1,
-            'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter'
+            'font_size': 13, 'font_name': 'Arial', 'bold': True, 'border': 1,
+            'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter', 'text_wrap': False
         })
+        # ✅ خط التوقيع والخاتم بحجم 14 كما طلبت
         sig_format = workbook.add_format({
             'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
         })
         
-        # ✅ إعدادات الطباعة المضمونة لصفحة واحدة
+        # ✅ إعدادات الطباعة لاحتواء كل الأعمدة في عرض صفحة واحدة
         worksheet.right_to_left()
-        worksheet.set_landscape()               # وضع أفقي لاستيعاب العرض
-        worksheet.fit_to_pages(1, 0)            # ✅ هذا السطر الوحيد الذي يضمن احتواء كل الأعمدة في عرض صفحة واحدة
-        worksheet.set_margins(left=0.3, right=0.3, top=0.4, bottom=0.4) # هوامش ضيقة جداً لاستغلال المساحة
+        worksheet.set_landscape()
+        worksheet.fit_to_pages(1, 0)          # يضمن عرض صفحة واحدة فقط
+        worksheet.set_margins(left=0.3, right=0.3, top=0.4, bottom=0.4)
         
-        # ✅ حساب عرض الأعمدة بشكل مضغوط ومنطقي
+        # ✅ حساب عرض الأعمدة ليتسع لسطر واحد دون التفاف
         for i, col in enumerate(df_excel.columns):
             try: 
-                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 1)
+                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
             except: 
                 max_len = 12
-            worksheet.set_column(i, i, min(max_len * 1.1, 35), cell_format) # عرض محكم يمنع الهدر
-        
+            # زيادة العرض بنسبة 1.4 مع حد أقصى 45 لمنع الضغط الزائد
+            worksheet.set_column(i, i, min(max_len * 1.4, 45), cell_format)
+            
         # ✅ الكتابة
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
         for row_num, row in enumerate(df_excel.values, start=1):
             for col_num, value in enumerate(row):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
-        
-        # ✅ التوقيع والخاتم
+                
+        # ✅ التوقيع والخاتم (حجم 14)
         last_row = len(df_excel) + 3
         worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
         worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
