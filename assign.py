@@ -4,27 +4,15 @@ import sqlite3
 from io import BytesIO
 import time
 
-
 # قاموس ترجمة الأعمدة
 COLUMN_NAMES_MAP = {
-    'الرقم': 'الرقم',
-    'id_num': 'رقم الهوية',
-    'name': 'الاسم رباعي',
-    'school_user': 'رقم المدرسة',
-    'school_full_name': 'اسم المدرسة',
-    'school2': 'المدرسة الثانية',
-    'phone': 'رقم الجوال',
-    'address': 'مكان السكن',
-    'relative_exam': 'اسم القريب المباشر',
-    'job_title': 'الوظيفة',
-    'desire': 'الرغبة',
-    'principal_note': 'رأي المدير',
-    'type': 'نوع النظام',
-    'gender': 'الجنس',
-    'subject': 'المبحث',
-    'branch': 'الفرع',
-    'has_relative': 'هل يوجد قريب؟',
-    'relative_details': 'تفاصيل القريب'
+    'الرقم': 'الرقم', 'id_num': 'رقم الهوية', 'name': 'الاسم رباعي',
+    'school_user': 'رقم المدرسة', 'school_full_name': 'اسم المدرسة',
+    'school2': 'المدرسة الثانية', 'phone': 'رقم الجوال', 'address': 'مكان السكن',
+    'relative_exam': 'اسم القريب المباشر', 'job_title': 'الوظيفة',
+    'desire': 'الرغبة', 'principal_note': 'رأي المدير', 'type': 'نوع النظام',
+    'gender': 'الجنس', 'subject': 'المبحث', 'branch': 'الفرع',
+    'has_relative': 'هل يوجد قريب؟', 'relative_details': 'تفاصيل القريب'
 }
 
 # --- 1. إعدادات الصفحة والتنسيق ---
@@ -70,7 +58,7 @@ RESIDENCE_AREAS = [
 ]
 GENDER_OPTIONS = ["", "ذكر", "أنثى"]
 
-# --- 2. قاعدة البيانات + إصلاح تلقائي للهيكل ---
+# --- 2. قاعدة البيانات ---
 conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -79,7 +67,6 @@ def auto_fix_db_schema():
     if [col[1] for col in c.fetchall()] != ['form_name', 'is_open']:
         c.execute("DROP TABLE IF EXISTS system_settings")
         c.execute('''CREATE TABLE system_settings (form_name TEXT PRIMARY KEY, is_open INTEGER)''')
-
     for tbl, create_sql in [
         ('main_table', 'id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, desire TEXT, principal_note TEXT, type TEXT, gender TEXT'),
         ('correction_table', 'id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, subject TEXT, branch TEXT, address TEXT, has_relative TEXT, relative_details TEXT, phone TEXT')
@@ -97,24 +84,67 @@ for form in ['ثانوية', 'توظيف', 'تصحيح']:
     c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
 
-def to_excel(df):
+# ✅ دالة تصدير إكسل منسقة باحترافية
+def to_excel_formatted(df, report_title="تقرير", school_name=""):
     output = BytesIO()
-    # إضافة الترقيم المتسلسل لملف الإكسل
     df_excel = df.copy()
-    if 'id' in df_excel.columns: df_excel = df_excel.drop(columns=['id'])
+    
+    # إزالة الأعمدة الداخلية
+    cols_to_drop = [col for col in ['id', 'school_user', 'school_full_name'] if col in df_excel.columns]
+    if cols_to_drop:
+        df_excel = df_excel.drop(columns=cols_to_drop)
+    
+    # إضافة عمود الترقيم
     df_excel.insert(0, 'الرقم', range(1, len(df_excel) + 1))
-    df_excel = df_excel.rename(columns=COLUMN_NAMES_MAP)
+    
+    # ترجمة أسماء الأعمدة
+    df_excel = df_excel.rename(columns={k: v for k, v in COLUMN_NAMES_MAP.items() if k in df_excel.columns})
     
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_excel.to_excel(writer, index=False, sheet_name='Sheet1')
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
+        
+        # ✅ تنسيقات الخلية
+        cell_format = workbook.add_format({
+            'font_size': 14, 'font_name': 'Arial', 'border': 1,
+            'align': 'center', 'valign': 'vcenter', 'text_wrap': True
+        })
+        header_format = workbook.add_format({
+            'font_size': 14, 'font_name': 'Arial', 'bold': True, 'border': 1,
+            'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter'
+        })
+        signature_format = workbook.add_format({
+            'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
+        })
+        
+        # ✅ اتجاه الورقة من اليمين لليسار
         worksheet.right_to_left()
-        cell_format = workbook.add_format({'font_size': 14, 'border': 1, 'align': 'center', 'valign': 'vcenter'})
-        header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bg_color': '#D7E4BC', 'border': 1, 'align': 'center'})
+        
+        # ✅ ضبط عرض الأعمدة تلقائياً
+        for i, col in enumerate(df_excel.columns):
+            max_len = max(df_excel[col].astype(str).map(len).max(), len(str(col)) + 2)
+            worksheet.set_column(i, i, min(max_len * 1.3, 50), cell_format)
+        
+        # ✅ تنسيق صف العناوين
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
-            worksheet.set_column(col_num, col_num, 22, cell_format)
+        
+        # ✅ تنسيق بيانات الجدول
+        for row_num, row in enumerate(df_excel.values, start=1):
+            for col_num, value in enumerate(row):
+                worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
+        
+        # ✅ إضافة توقيع المدير والخاتم أسفل الجدول
+        last_row = len(df_excel) + 3
+        worksheet.merge_range(f'A{last_row}:C{last_row}', 'توقيع مدير المدرسة: ........................', signature_format)
+        worksheet.merge_range(f'D{last_row}:F{last_row}', f'خاتم المدرسة: {school_name}', signature_format)
+        
+        # ✅ إعدادات الطباعة: صفحة واحدة عرضاً
+        worksheet.set_print_area(0, 0, len(df_excel), len(df_excel.columns) - 1)
+        worksheet.fit_to_pages(1, 0)  # عرض في صفحة واحدة، الطول حر
+        worksheet.set_margins(left=0.5, right=0.5, top=0.7, bottom=0.7)
+        
     return output.getvalue()
 
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
@@ -141,7 +171,6 @@ def validate_inputs(id_num, phone):
 if not st.session_state['auth']:
     st.title("🏛️ بوابة تجميع المراقبة والتصحيح مديرية التربية والتعليم - جنوب نابلس")
     tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول القسم"])
-    
     with tab1:
         with st.form(key="school_login_form"):
             u_in = st.text_input("رقم المدرسة", key="school_user_input").strip()
@@ -155,7 +184,6 @@ if not st.session_state['auth']:
                         st.rerun()
                     else: st.error("❌ بيانات الحساب خاطئة")
                 else: st.error("❌ فشل الاتصال")
-                
     with tab2:
         with st.form(key="admin_login_form"):
             adm_pass = st.text_input("كلمة مرور القسم", type="password", key="admin_pass_input")
@@ -217,7 +245,6 @@ if st.session_state['user_type'] == "school":
                     school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"sec_school2_{st.session_state.reset_key}")
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"desire_sec_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"note_sec_{st.session_state.reset_key}")
-                    
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
                         if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
                         elif validate_inputs(id_num, phone):
@@ -237,36 +264,26 @@ if st.session_state['user_type'] == "school":
                 address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"job_addr_{st.session_state.reset_key}")
                 job = c1.selectbox("الوظيفة *", ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"], index=0, key=f"job_title_sel_{st.session_state.reset_key}")
                 gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"job_gender_{st.session_state.reset_key}")
-                
                 st.divider()
                 school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
                 desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
                 note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
-                
                 has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_radio_{st.session_state.reset_key}")
-                
                 rel_exam = ""
                 if has_rel == "يوجد":
                     rel_exam = st.text_input("الاسم الرباعي للقريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
-        
                 st.divider()
                 if st.button("💾 حفظ بيانات التوظيف", key=f"save_btn_job_{st.session_state.reset_key}"):
-                    if not (name and id_num and phone and address and job and gender): 
-                        st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
-                    elif has_rel == "يوجد" and not rel_exam: 
-                        st.error("⚠️ يرجى إدخال اسم القريب المباشر")
+                    if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                    elif has_rel == "يوجد" and not rel_exam: st.error("⚠️ يرجى إدخال اسم القريب المباشر")
                     elif validate_inputs(id_num, phone):
                         try:
                             c.execute("""INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                                     (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
-                            conn.commit()
-                            st.success("✅ تم الحفظ بنجاح")
-                            st.session_state.reset_key += 1
-                            time.sleep(1)
-                            st.rerun()
+                            conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
                         except Exception as e: st.error(f"❌ خطأ: {str(e)}")
        
-        # ==================== تبويب التصحيح (تفاعلي) ====================
+        # ==================== تبويب التصحيح ====================
         with t_cor:
             if get_form_status('تصحيح'):
                 c1, c2 = st.columns(2)
@@ -276,33 +293,21 @@ if st.session_state['user_type'] == "school":
                 c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"cor_addr_{st.session_state.reset_key}")
                 c_branch = c1.selectbox("الفرع *", ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"], index=0, key=f"cor_branch_{st.session_state.reset_key}")
                 c_subj = c2.selectbox("المبحث *", ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص", "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"], index=0, key=f"cor_subj_{st.session_state.reset_key}")
-                
                 st.divider()
-                
                 has_rel_cor = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_cor_radio_{st.session_state.reset_key}")
-                
                 rel_details = ""
                 if has_rel_cor == "يوجد":
                     rel_details = st.text_input("اسم القريب المباشر *", key=f"rel_det_input_{st.session_state.reset_key}")
-                
                 st.divider()
-                
                 if st.button("💾 حفظ بيانات التصحيح", key=f"btn_save_cor_{st.session_state.reset_key}"):
-                    if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): 
-                        st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
-                    elif has_rel_cor == "يوجد" and not rel_details: 
-                        st.error("⚠️ يرجى إدخال اسم القريب المباشر")
+                    if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                    elif has_rel_cor == "يوجد" and not rel_details: st.error("⚠️ يرجى إدخال اسم القريب المباشر")
                     elif validate_inputs(c_id, c_phone):
                         try:
                             c.execute("""INSERT INTO correction_table (id_num, name, school_user, school_full_name, subject, branch, address, has_relative, relative_details, phone) VALUES (?,?,?,?,?,?,?,?,?,?)""", 
                                     (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel_cor, rel_details, c_phone))
-                            conn.commit()
-                            st.success("✅ تم الحفظ بنجاح")
-                            st.session_state.reset_key += 1
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as e: 
-                            st.error(f"❌ خطأ في قاعدة البيانات: {str(e)}")
+                            conn.commit(); st.success("✅ تم الحفظ بنجاح"); st.session_state.reset_key += 1; time.sleep(1); st.rerun()
+                        except Exception as e: st.error(f"❌ خطأ في قاعدة البيانات: {str(e)}")
 
     elif st.session_state.menu_choice == "التقارير":
         st.subheader("📊 سجلات المدرسة الموثقة")
@@ -312,25 +317,38 @@ if st.session_state['user_type'] == "school":
             df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
             if report_type == "الثانوية العامة": df1 = df1[df1['type'] == "الثانوية العامة"]
             elif report_type == "امتحان التوظيف": df1 = df1[df1['type'] == "امتحان التوظيف"]
-            
             if not df1.empty: 
                 st.info("🔹 كشف المراقبة والتوظيف")
-                # تطبيق الترقيم المتسلسل
                 d1 = df1.drop(columns=['id', 'school_user', 'school_full_name']).copy()
-                d1.insert(0, 'الرقم', list(range(1, len(d1) + 1)))
-                d1 = d1.reset_index(drop=True)
+                d1.insert(0, 'الرقم', range(1, len(d1) + 1))
                 st.dataframe(d1.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
+                
+                # ✅ زر تحميل إكسل منسق للتوظيف/الثانوية
+                st.download_button(
+                    label="📥 تحميل كشف المراقبة/التوظيف (إكسل منسق)",
+                    data=to_excel_formatted(df1, "كشف المراقبة والتوظيف", st.session_state['school_display_name']),
+                    file_name=f"{st.session_state['school_display_name']}_مراقبة_توظيف.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_main_{st.session_state.reset_key}"
+                )
         
         if report_type in ["الكل", "التصحيح"]:
             df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
             if not df2.empty: 
                 if report_type != "الكل": st.divider()
                 st.success("🔹 كشف التصحيح")
-                # تطبيق الترقيم المتسلسل
                 d2 = df2.drop(columns=['id', 'school_user', 'school_full_name']).copy()
-                d2.insert(0, 'الرقم', list(range(1, len(d2) + 1)))  # ✅ تحويل range إلى قائمة
-                d2 = d2.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
+                d2.insert(0, 'الرقم', range(1, len(d2) + 1))
                 st.dataframe(d2.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
+                
+                # ✅ زر تحميل إكسل منسق للتصحيح
+                st.download_button(
+                    label="📥 تحميل كشف التصحيح (إكسل منسق)",
+                    data=to_excel_formatted(df2, "كشف التصحيح", st.session_state['school_display_name']),
+                    file_name=f"{st.session_state['school_display_name']}_تصحيح.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_cor_{st.session_state.reset_key}"
+                )
 
 # --- شاشة الإدارة ---
 elif st.session_state['user_type'] == "admin":
@@ -363,10 +381,8 @@ elif st.session_state['user_type'] == "admin":
             sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}_{st.session_state.reset_key}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             if not f_df.empty:
-                # تطبيق الترقيم المتسلسل في شاشة الإدارة
                 admin_disp = f_df.drop(columns=['id']).copy()
-                admin_disp.insert(0, 'الرقم', list(range(1, len(admin_disp) + 1)))  # ✅ تحويل range إلى قائمة
-                admin_disp = admin_disp.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
+                admin_disp.insert(0, 'الرقم', range(1, len(admin_disp) + 1))
                 st.dataframe(admin_disp.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
                 
                 st.write("🗑️ **لحذف سجل محدد يدوياً:**")
@@ -381,8 +397,7 @@ elif st.session_state['user_type'] == "admin":
                                 else: c.execute("DELETE FROM correction_table WHERE id_num=? AND school_full_name=?" if is_c else "DELETE FROM main_table WHERE id_num=? AND school_full_name=?", (del_id, del_school))
                                 conn.commit(); st.success("✅ تم حذف السجل"); time.sleep(1); st.rerun()
                             except Exception as e: st.error(f"❌ خطأ: {str(e)}")
-                
-                st.download_button(label=f"📥 تحميل ({t_name})", data=to_excel(f_df), file_name=f'admin_{k_s}.xlsx')
+                st.download_button(label=f"📥 تحميل ({t_name})", data=to_excel_formatted(f_df, t_name, ""), file_name=f'admin_{k_s}.xlsx')
             else: st.info("لا توجد بيانات لعرضها")
         
         with t1: view_admin("الثانوية العامة", "الثانوية العامة", "tw")
