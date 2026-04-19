@@ -105,35 +105,39 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
         
-        # ✅ تنسيقات
+        # ✅ زيادة حجم الخط إلى 16 للطباعة الواضحة
         cell_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'border': 1,
+            'font_size': 16, 'font_name': 'Arial', 'border': 1,
             'align': 'center', 'valign': 'vcenter', 'text_wrap': True
         })
         header_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'bold': True, 'border': 1,
+            'font_size': 16, 'font_name': 'Arial', 'bold': True, 'border': 1,
             'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter'
         })
         signature_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
+            'font_size': 16, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
         })
         
-        # ✅ اتجاه عربي
+        # ✅ اتجاه عربي + إعدادات الطباعة الاحترافية
         worksheet.right_to_left()
+        worksheet.set_paper(9)          # حجم A4
+        worksheet.set_landscape()       # وضع أفقي (أفضل للجداول العريضة)
+        worksheet.set_print_scale(100)  # طباعة بالحجم الطبيعي 100% (بدون تصغير)
+        worksheet.set_default_row(height=35) # ارتفاع مناسب للصفوف للطباعة
+        worksheet.set_margins(left=0.5, right=0.5, top=0.7, bottom=0.7)
         
-        # ✅ ضبط عرض الأعمدة بشكل آمن
+        # ✅ ضبط عرض الأعمدة
         for i, col in enumerate(df_excel.columns):
             try:
                 max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
             except:
                 max_len = 15
-            worksheet.set_column(i, i, min(max_len * 1.4, 50), cell_format)
+            worksheet.set_column(i, i, min(max_len * 1.5, 60), cell_format)
         
-        # ✅ كتابة العناوين
+        # ✅ كتابة العناوين والبيانات
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
             
-        # ✅ كتابة البيانات
         for row_num, row in enumerate(df_excel.values, start=1):
             for col_num, value in enumerate(row):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
@@ -142,10 +146,6 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         last_row = len(df_excel) + 3
         worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', signature_format)
         worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', signature_format)
-        
-        # ✅ إعدادات الطباعة (بديل آمن عن set_print_area)
-        worksheet.fit_to_pages(1, 0)  # عرض في صفحة واحدة، الطول حر
-        worksheet.set_margins(left=0.4, right=0.4, top=0.5, bottom=0.5)
         
     return output.getvalue()
 
