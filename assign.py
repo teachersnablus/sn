@@ -168,8 +168,8 @@ if not st.session_state['auth']:
     with tab1:
         # ✅ التعديل 3: دعم زر ENTER في الدخول باستخدام form
         with st.form(key="school_login_form"):
-            u_in = st.text_input("رقم المدرسة").strip()
-            p_in = st.text_input("كلمة المرور", type="password").strip()
+            u_in = st.text_input("رقم المدرسة", key="school_user_input").strip()
+            p_in = st.text_input("كلمة المرور", type="password", key="school_pass_input").strip()
             login_submitted = st.form_submit_button("دخول المدارس")
             
             if login_submitted:
@@ -185,7 +185,7 @@ if not st.session_state['auth']:
     with tab2:
         # ✅ التعديل 3: دعم زر ENTER في الدخول باستخدام form
         with st.form(key="admin_login_form"):
-            adm_pass = st.text_input("كلمة مرور القسم", type="password")
+            adm_pass = st.text_input("كلمة مرور القسم", type="password", key="admin_pass_input")
             admin_submitted = st.form_submit_button("دخول القسم")
             
             if admin_submitted:
@@ -217,19 +217,22 @@ if st.session_state['user_type'] == "school":
         with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية للتعديل</div>", unsafe_allow_html=True)
         with col_inp: search_id = st.text_input("", placeholder="أدخل رقم الهوية...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
-        found_rows = []
-        if search_id:
+        # ✅ إصلاح: تهيئة found_rows كـ DataFrame فارغ بدلاً من قائمة
+        found_rows = pd.DataFrame()
+        
+        if search_id and len(search_id) == 9 and search_id.isdigit():
             # البحث في main_table و correction_table للمدرسة الحالية
             df_m = pd.read_sql_query("SELECT *, 'main' as tbl FROM main_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
             df_c = pd.read_sql_query("SELECT *, 'correction' as tbl FROM correction_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
-            found_rows = pd.concat([df_m, df_c], ignore_index=True) if not df_m.empty or not df_c.empty else pd.DataFrame()
             
-            if not found_rows.empty:
+            if not df_m.empty or not df_c.empty:
+                found_rows = pd.concat([df_m, df_c], ignore_index=True)
                 st.success(f"✅ تم العثور على {len(found_rows)} سجل(سجلات) للموظف")
             else:
                 st.info("ℹ️ الرقم متاح للتسجيل.")
 
-        if not found_rows.empty:
+        # ✅ إصلاح: التحقق من أن found_rows هو DataFrame قبل استخدام .empty
+        if isinstance(found_rows, pd.DataFrame) and not found_rows.empty:
             if st.button("🗑️ حذف جميع السجلات لهذا الرقم من مدرستك"):
                 c.execute("DELETE FROM main_table WHERE id_num=? AND school_user=?", (search_id, st.session_state['school_user']))
                 c.execute("DELETE FROM correction_table WHERE id_num=? AND school_user=?", (search_id, st.session_state['school_user']))
@@ -247,31 +250,31 @@ if st.session_state['user_type'] == "school":
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "")
-                    name = c1.text_input("الاسم رباعي *", value="")
-                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="")
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"sec_id_{st.session_state.reset_key}")
+                    name = c1.text_input("الاسم رباعي *", value="", key=f"sec_name_{st.session_state.reset_key}")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key=f"sec_phone_{st.session_state.reset_key}")
                     
                     # ✅ مكان السكن - قائمة منسدلة
-                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0)
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"sec_addr_{st.session_state.reset_key}")
                     
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
-                    job = c1.selectbox("الوظيفة *", job_list, index=0)
+                    job = c1.selectbox("الوظيفة *", job_list, index=0, key=f"sec_job_{st.session_state.reset_key}")
                     
                     # ✅ حقل الجنس - جديد
-                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0)
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"sec_gender_{st.session_state.reset_key}")
                     
                     st.divider()
-                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="")
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"sec_school2_{st.session_state.reset_key}")
                     
                     # ✅ التعديل 2: خيار القريب المباشر مع إظهار/إخفاء الحقل
-                    has_relative_sec = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_sec")
+                    has_relative_sec = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_sec_{st.session_state.reset_key}")
                     if has_relative_sec == "يوجد":
-                        rel_name = st.text_input("اسم القريب المباشر", key="rel_name_sec")
+                        rel_name = st.text_input("اسم القريب المباشر", key=f"rel_name_sec_{st.session_state.reset_key}")
                     else:
                         rel_name = ""
                     
-                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
-                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
+                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"desire_sec_{st.session_state.reset_key}")
+                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"note_sec_{st.session_state.reset_key}")
                     
                     if st.form_submit_button("💾 حفظ بيانات الثانوية"):
                         if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
@@ -291,31 +294,31 @@ if st.session_state['user_type'] == "school":
             if get_form_status('توظيف'):
                 with st.form(key=f"job_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key="job_id")
-                    name = c1.text_input("الاسم رباعي *", value="", key="job_name")
-                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key="job_phone")
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
+                    name = c1.text_input("الاسم رباعي *", value="", key=f"job_name_{st.session_state.reset_key}")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key=f"job_phone_{st.session_state.reset_key}")
                     
                     # ✅ مكان السكن - قائمة منسدلة
-                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key="job_addr")
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"job_addr_{st.session_state.reset_key}")
                     
                     job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
-                    job = c1.selectbox("الوظيفة *", job_list, index=0, key="job_title_sel")
+                    job = c1.selectbox("الوظيفة *", job_list, index=0, key=f"job_title_sel_{st.session_state.reset_key}")
                     
                     # ✅ حقل الجنس - جديد
-                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key="job_gender")
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key=f"job_gender_{st.session_state.reset_key}")
                     
                     st.divider()
-                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key="job_school2")
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key=f"job_school2_{st.session_state.reset_key}")
                     
                     # ✅ التعديل 2: خيار القريب المباشر مع إظهار/إخفاء الحقل
-                    has_relative_job = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_job")
+                    has_relative_job = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_{st.session_state.reset_key}")
                     if has_relative_job == "يوجد":
-                        rel_exam = st.text_input("اسم القريب المباشر", key="rel_exam_job")
+                        rel_exam = st.text_input("اسم القريب المباشر", key=f"rel_exam_job_{st.session_state.reset_key}")
                     else:
                         rel_exam = ""
                     
-                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
-                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
+                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
+                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
                     
                     if st.form_submit_button("💾 حفظ بيانات التوظيف"):
                         if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
@@ -335,20 +338,20 @@ if st.session_state['user_type'] == "school":
             if get_form_status('تصحيح'):
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
-                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key="cor_id")
-                    c_name = c1.text_input("الاسم الرباعي *", value="", key="cor_name")
-                    c_phone = c1.text_input("الجوال (10 أرقام) *", value="", key="cor_phone")
-                    c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key="cor_addr")
+                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"cor_id_{st.session_state.reset_key}")
+                    c_name = c1.text_input("الاسم الرباعي *", value="", key=f"cor_name_{st.session_state.reset_key}")
+                    c_phone = c1.text_input("الجوال (10 أرقام) *", value="", key=f"cor_phone_{st.session_state.reset_key}")
+                    c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key=f"cor_addr_{st.session_state.reset_key}")
                     branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
-                    c_branch = c1.selectbox("الفرع *", branch_list, index=0, key="cor_branch")
+                    c_branch = c1.selectbox("الفرع *", branch_list, index=0, key=f"cor_branch_{st.session_state.reset_key}")
                     sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص",  "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
-                    c_subj = c2.selectbox("المبحث *", sub_list, index=0, key="cor_subj")
+                    c_subj = c2.selectbox("المبحث *", sub_list, index=0, key=f"cor_subj_{st.session_state.reset_key}")
                     st.divider()
                     
                     # ✅ التعديل 2: خيار القريب المباشر في التصحيح مع إظهار/إخفاء الحقل
-                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_cor")
+                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_cor_{st.session_state.reset_key}")
                     if has_rel == "يوجد":
-                        rel_details = st.text_input("اسم القريب", key="rel_det_cor")
+                        rel_details = st.text_input("اسم القريب", key=f"rel_det_cor_{st.session_state.reset_key}")
                     else:
                         rel_details = ""
                     
@@ -367,7 +370,7 @@ if st.session_state['user_type'] == "school":
         st.subheader("📊 سجلات المدرسة الموثقة")
         
         # ✅ التعديل 4: إضافة فلتر لاختيار النظام المطلوب عرض تقريره
-        report_type = st.selectbox("اختر النظام لعرض التقرير:", ["الكل", "الثانوية العامة", "امتحان التوظيف", "التصحيح"], key="report_filter")
+        report_type = st.selectbox("اختر النظام لعرض التقرير:", ["الكل", "الثانوية العامة", "امتحان التوظيف", "التصحيح"], key=f"report_filter_{st.session_state.reset_key}")
         
         if report_type in ["الكل", "الثانوية العامة", "امتحان التوظيف"]:
             df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
@@ -410,7 +413,7 @@ elif st.session_state['user_type'] == "admin":
             with cols[i]:
                 curr = get_form_status(f)
                 st.write(f"نموذج {f}: {'✅ مفتوح' if curr else '❌ مغلق'}")
-                if st.button(f"تغيير حالة {f}", key=f"at_{f}"): 
+                if st.button(f"تغيير حالة {f}", key=f"at_{f}_{st.session_state.reset_key}"): 
                     c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f))
                     conn.commit()
                     st.rerun()
@@ -422,12 +425,12 @@ elif st.session_state['user_type'] == "admin":
             
             # ✅ التعديل 1: إضافة فلتر للمكررين (نفس id_num في مدارس مختلفة)
             if not is_c and not df.empty:
-                dup_filter = st.checkbox(f"✅ عرض المكررين فقط ({t_name})", key=f"dup_{k_s}", help="عرض الأرقام المسجلة في أكثر من مدرسة")
+                dup_filter = st.checkbox(f"✅ عرض المكررين فقط ({t_name})", key=f"dup_{k_s}_{st.session_state.reset_key}", help="عرض الأرقام المسجلة في أكثر من مدرسة")
                 if dup_filter:
                     dup_ids = df.groupby('id_num').filter(lambda x: x['school_full_name'].nunique() > 1)['id_num'].unique()
                     df = df[df['id_num'].isin(dup_ids)]
             
-            sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}")
+            sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}_{st.session_state.reset_key}")
             f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
             
             # ✅ التعديل 1: إضافة واجهة للحذف اليدوي لسجل محدد
@@ -436,11 +439,11 @@ elif st.session_state['user_type'] == "admin":
                 st.write("🗑️ **لحذف سجل محدد يدوياً:**")
                 col_del1, col_del2, col_del3 = st.columns([3, 3, 1])
                 with col_del1:
-                    del_id = st.text_input("رقم الهوية:", key=f"del_id_{k_s}")
+                    del_id = st.text_input("رقم الهوية:", key=f"del_id_{k_s}_{st.session_state.reset_key}")
                 with col_del2:
-                    del_school = st.selectbox("المدرسة:", ["الكل"] + list(f_df['school_full_name'].dropna().unique()), key=f"del_sch_{k_s}")
+                    del_school = st.selectbox("المدرسة:", ["الكل"] + list(f_df['school_full_name'].dropna().unique()), key=f"del_sch_{k_s}_{st.session_state.reset_key}")
                 with col_del3:
-                    if st.button("حذف", key=f"btn_del_{k_s}"):
+                    if st.button("حذف", key=f"btn_del_{k_s}_{st.session_state.reset_key}"):
                         if del_id:
                             if del_school == "الكل":
                                 c.execute("DELETE FROM correction_table WHERE id_num=?" if is_c else "DELETE FROM main_table WHERE id_num=?", (del_id,))
@@ -458,3 +461,4 @@ elif st.session_state['user_type'] == "admin":
         with t1: view_admin("الثانوية العامة", "الثانوية العامة", "tw")
         with t2: view_admin("امتحان التوظيف", "امتحان التوظيف", "em")
         with t3: view_admin("تصحيح", "", "cr", True)
+            
