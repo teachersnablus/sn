@@ -89,10 +89,14 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
     output = BytesIO()
     df_excel = df.copy()
     
+    # إزالة الأعمدة الداخلية
     cols_to_drop = [col for col in ['id', 'school_user', 'school_full_name'] if col in df_excel.columns]
     if cols_to_drop: df_excel = df_excel.drop(columns=cols_to_drop)
     
+    # إضافة الترقيم
     df_excel.insert(0, 'الرقم', range(1, len(df_excel) + 1))
+    
+    # ترجمة الأعمدة
     df_excel = df_excel.rename(columns={k: v for k, v in COLUMN_NAMES_MAP.items() if k in df_excel.columns})
     
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -100,7 +104,7 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
         
-        # ✅ إزالة text_wrap لضمان سطر واحد داخل الخلية
+        # ✅ تنسيق الخلايا (خط 13، سطر واحد، حدود كاملة)
         cell_format = workbook.add_format({
             'font_size': 13, 'font_name': 'Arial', 'border': 1,
             'align': 'center', 'valign': 'vcenter', 'text_wrap': False
@@ -109,37 +113,34 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
             'font_size': 13, 'font_name': 'Arial', 'bold': True, 'border': 1,
             'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter', 'text_wrap': False
         })
-        # ✅ خط التوقيع والخاتم بحجم 14 كما طلبت
+        # ✅ تنسيق التوقيع والخاتم (خط 14 كما طلبت)
         sig_format = workbook.add_format({
-            'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
+            'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'vcenter', 'border': 0
         })
         
-        # ✅ إعدادات الطباعة لاحتواء كل الأعمدة في عرض صفحة واحدة
+        # ✅ إعدادات الطباعة والصفحة
         worksheet.right_to_left()
-        worksheet.set_landscape()
-        worksheet.fit_to_pages(1, 0)          # يضمن عرض صفحة واحدة فقط
+        worksheet.set_landscape()               # وضع أفقي
+        worksheet.fit_to_pages(1, 0)            # احتواء العرض في صفحة واحدة
         worksheet.set_margins(left=0.3, right=0.3, top=0.4, bottom=0.4)
         
-        # ✅ حساب عرض الأعمدة ليتسع لسطر واحد دون التفاف
+        # ✅ ضبط عرض الأعمدة ديناميكياً
         for i, col in enumerate(df_excel.columns):
-            try: 
-                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
-            except: 
-                max_len = 12
-            # زيادة العرض بنسبة 1.4 مع حد أقصى 45 لمنع الضغط الزائد
+            try: max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
+            except: max_len = 12
             worksheet.set_column(i, i, min(max_len * 1.4, 45), cell_format)
             
-        # ✅ الكتابة
+        # ✅ كتابة الرؤوس والبيانات
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
         for row_num, row in enumerate(df_excel.values, start=1):
             for col_num, value in enumerate(row):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
                 
-        # ✅ التوقيع والخاتم (حجم 14)
-        last_row = len(df_excel) + 3
-        worksheet.merge_range(f'A{last_row}:F{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
-        worksheet.merge_range(f'E{last_row}:L{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
+        # ✅ التوقيع والخاتم (باستخدام write لتجنب خطأ التداخل)
+        sig_row = len(df_excel) + 3
+        worksheet.write(f'A{sig_row}', 'توقيع مدير المدرسة: ........................', sig_format)
+        worksheet.write(f'G{sig_row}', f'خاتم المدرسة: {school_name}', sig_format)
         
     return output.getvalue()
 
