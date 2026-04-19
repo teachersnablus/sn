@@ -138,8 +138,8 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
                 
         # ✅ التوقيع والخاتم (حجم 14)
         last_row = len(df_excel) + 3
-        worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
-        worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
+        worksheet.merge_range(f'A{last_row}:F{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
+        worksheet.merge_range(f'E{last_row}:L{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
         
     return output.getvalue()
 
