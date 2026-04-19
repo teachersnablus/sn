@@ -1,21 +1,460 @@
-# كود تحديث قاعدة البيانات (تشغيل مرة واحدة فقط)
+import streamlit as st
+import pandas as pd
+import sqlite3
+from io import BytesIO
+import time
+
+# --- 1. إعدادات الصفحة والتنسيق ---
+st.set_page_config(page_title="نظام قسم الإمتحانات مديرية جنوب نابلس", layout="wide")
+
+st.markdown("""
+    <style>
+        /* تثبيت الترويسة العلوي */
+        .custom-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #1a1c23;
+            color: white;
+            text-align: center;
+            padding: 15px 0;
+            z-index: 9999;
+            border-bottom: 2px solid #00ffcc;
+            line-height: 1.5;
+            direction: rtl;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+        }
+        
+        /* إخفاء القائمة الجانبية بالكامل */
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+
+        /* إزاحة محتوى التطبيق لأسفل */
+        .stApp {
+            margin-top: 80px;
+        }
+
+        header {visibility: hidden;}
+
+        /* تنسيقات الخط والاتجاه */
+        html, body, [class*="st-"] {
+            font-size: 19px !important;
+            direction: rtl;
+            text-align: right;
+        }
+        .stApp { direction: rtl; text-align: right; }
+        
+        div[data-testid="stForm"] { 
+            text-align: right; 
+            border: 1px solid #ddd; 
+            padding: 25px; 
+            border-radius: 12px; 
+        }
+        
+        .school-title { 
+            color: #ffffff; 
+            background-color: #1E3A8A; 
+            padding: 20px; 
+            border-radius: 10px; 
+            text-align: center; 
+            font-size: 26px !important; 
+            font-weight: bold; 
+            margin-top: 20px;
+            margin-bottom: 20px; 
+        }
+        .search-row-label {
+            font-size: 20px !important;
+            font-weight: bold;
+            color: #ffffff; 
+            background-color: #1E3A8A; 
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+    
+    <div class="custom-header">
+        <div style="font-weight: bold; font-size: 1.2rem;">إعداد وتصميم : عوض نعمان ريده</div>
+        <div style="font-size: 1rem; color: #00ffcc;">قسم الامتحانات - مديرية التربية والتعليم جنوب نابلس</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+SCHOOLS_ACCOUNTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSOJxPb5ehu2HFPrbcqY2eXXkmjEu6-LVG-6klv03BNeskIF1JwoM3acLy2zTilT74FlFhQ0ohDVItT/pub?gid=1573939462&single=true&output=csv"
+
+@st.cache_data(ttl=600)
+def load_accounts():
+    try:
+        return pd.read_csv(SCHOOLS_ACCOUNTS_URL)
+    except:
+        return pd.DataFrame(columns=['school_user', 'password', 'school_full_name'])
+
+# --- قائمة المناطق السكنية ---
+RESIDENCE_AREAS = [
+    "", "نابلس", "رام الله", "سلفيت", "طولكرم", "عورتا", "أودلا", "بيتا", "عقربا", 
+    "مجدل بني فاضل", "دوما", "قريوت", "جالود", "تلفيت", "قصرة", "جوريش", "قبلان", 
+    "يتما", "اللبن", "الساوية", "جماعين", "زيتا", "عوريف", "عصيرة القبلية", "بورين", 
+    "مادما","عينابوس","حوارة", "يانون", "أوصرين"
+]
+
+# --- خيارات الجنس ---
+GENDER_OPTIONS = ["", "ذكر", "أنثى"]
+
+# --- 2. قاعدة البيانات ---
 conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
 
-# إنشاء جداول جديدة بالهيكل المحدَّث
-c.execute('''CREATE TABLE IF NOT EXISTS main_table_new
+# ✅ التعديل 1: تغيير PRIMARY KEY من id_num إلى id تلقائي للسماح بتسجيلات متعددة لنفس الهوية من مدارس مختلفة
+c.execute('''CREATE TABLE IF NOT EXISTS main_table 
              (id INTEGER PRIMARY KEY AUTOINCREMENT, 
               id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, 
               phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, 
               desire TEXT, principal_note TEXT, type TEXT, gender TEXT)''')
 
-c.execute('''INSERT INTO main_table_new (id_num, name, school_user, school_full_name, school2, 
-              phone, address, relative_exam, job_title, desire, principal_note, type, gender)
-             SELECT id_num, name, school_user, school_full_name, school2, 
-              phone, address, relative_exam, job_title, desire, principal_note, type, gender 
-              FROM main_table''')
+c.execute('''CREATE TABLE IF NOT EXISTS correction_table 
+             (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, 
+              subject TEXT, branch TEXT, address TEXT, 
+              has_relative TEXT, relative_details TEXT, phone TEXT)''')
 
-c.execute("DROP TABLE main_table")
-c.execute("ALTER TABLE main_table_new RENAME TO main_table")
+c.execute('''CREATE TABLE IF NOT EXISTS system_settings (form_name TEXT PRIMARY KEY, is_open INTEGER)''')
+for form in ['ثانوية', 'توظيف', 'تصحيح']:
+    c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
-conn.close()
+
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        workbook = writer.book
+        worksheet = writer.sheets['Sheet1']
+        worksheet.right_to_left()
+        cell_format = workbook.add_format({'font_size': 14, 'border': 1, 'align': 'center', 'valign': 'vcenter'})
+        header_format = workbook.add_format({'bold': True, 'font_size': 14, 'bg_color': '#D7E4BC', 'border': 1, 'align': 'center'})
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            worksheet.set_column(col_num, col_num, 22, cell_format)
+    return output.getvalue()
+
+if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
+if 'auth' not in st.session_state: st.session_state.update({'auth': False, 'school_display_name': "", 'school_user': "", 'user_type': "", 'menu_choice': "إضافة"})
+
+def get_form_status(form_name):
+    c.execute("SELECT is_open FROM system_settings WHERE form_name=?", (form_name,))
+    res = c.fetchone()
+    return res[0] == 1 if res else True
+
+def validate_inputs(id_num, phone):
+    if len(id_num) != 9 or not id_num.isdigit():
+        st.error("❌ خطأ: رقم الهوية يجب أن يتكون من 9 أرقام بالضبط.")
+        return False
+    if len(phone) != 10 or not phone.isdigit():
+        st.error("❌ خطأ: رقم الجوال يجب أن يتكون من 10 أرقام بالضبط.")
+        return False
+    return True
+
+def get_index_safe(options_list, value):
+    """دالة مساعدة لإيجاد الفهرس بأمان في القوائم المنسدلة"""
+    if value in options_list:
+        return options_list.index(value)
+    return 0
+
+# --- 3. تسجيل الدخول ---
+if not st.session_state['auth']:
+    st.title("🏛️ بوابة تجميع المراقبة والتصحيح مديرية التربية والتعليم - جنوب نابلس")
+    tab1, tab2 = st.tabs(["🔐 دخول المدارس", "🛠️ دخول القسم"])
+    
+    with tab1:
+        # ✅ التعديل 3: دعم زر ENTER في الدخول باستخدام form
+        with st.form(key="school_login_form"):
+            u_in = st.text_input("رقم المدرسة").strip()
+            p_in = st.text_input("كلمة المرور", type="password").strip()
+            login_submitted = st.form_submit_button("دخول المدارس")
+            
+            if login_submitted:
+                df_acc = load_accounts()
+                if df_acc is not None and not df_acc.empty:
+                    match = df_acc[(df_acc['school_user'].astype(str) == u_in) & (df_acc['password'].astype(str) == p_in)]
+                    if not match.empty:
+                        st.session_state.update({'auth': True, 'user_type': "school", 'school_user': u_in, 'school_display_name': str(match.iloc[0]['school_full_name'])})
+                        st.rerun()
+                    else: st.error("❌ بيانات الحساب خاطئة")
+                else: st.error("❌ فشل الاتصال - يرجى المحاولة مرة أخرى")
+                
+    with tab2:
+        # ✅ التعديل 3: دعم زر ENTER في الدخول باستخدام form
+        with st.form(key="admin_login_form"):
+            adm_pass = st.text_input("كلمة مرور القسم", type="password")
+            admin_submitted = st.form_submit_button("دخول القسم")
+            
+            if admin_submitted:
+                if adm_pass == "ADMIN2026":
+                    st.session_state.update({'auth': True, 'user_type': "admin", 'menu_choice': "إدارة البيانات"})
+                    st.rerun()
+                else: st.error("❌ كلمة المرور غير صحيحة")
+    st.stop()
+
+# --- شاشة المدارس ---
+if st.session_state['user_type'] == "school":
+    # أزرار التنقل العلوية
+    nav1, nav2, nav3, nav4 = st.columns([1, 1, 2, 1])
+    with nav1:
+        if st.button("➕ إضافة بيانات", use_container_width=True):
+            st.session_state.menu_choice = "إضافة"
+    with nav2:
+        if st.button("📊 التقارير", use_container_width=True):
+            st.session_state.menu_choice = "التقارير"
+    with nav4:
+        if st.button("🚪 تسجيل الخروج", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+
+    st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
+
+    if st.session_state.menu_choice == "إضافة":
+        col_lbl, col_inp = st.columns([1.2, 3])
+        with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية للتعديل</div>", unsafe_allow_html=True)
+        with col_inp: search_id = st.text_input("", placeholder="أدخل رقم الهوية...", key=f"search_{st.session_state.reset_key}", label_visibility="collapsed").strip()
+        
+        found_rows = []
+        if search_id:
+            # البحث في main_table و correction_table للمدرسة الحالية
+            df_m = pd.read_sql_query("SELECT *, 'main' as tbl FROM main_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
+            df_c = pd.read_sql_query("SELECT *, 'correction' as tbl FROM correction_table WHERE id_num=? AND school_user=?", conn, params=(search_id, st.session_state['school_user']))
+            found_rows = pd.concat([df_m, df_c], ignore_index=True) if not df_m.empty or not df_c.empty else pd.DataFrame()
+            
+            if not found_rows.empty:
+                st.success(f"✅ تم العثور على {len(found_rows)} سجل(سجلات) للموظف")
+            else:
+                st.info("ℹ️ الرقم متاح للتسجيل.")
+
+        if not found_rows.empty:
+            if st.button("🗑️ حذف جميع السجلات لهذا الرقم من مدرستك"):
+                c.execute("DELETE FROM main_table WHERE id_num=? AND school_user=?", (search_id, st.session_state['school_user']))
+                c.execute("DELETE FROM correction_table WHERE id_num=? AND school_user=?", (search_id, st.session_state['school_user']))
+                conn.commit()
+                st.session_state.reset_key += 1
+                st.success("✅ تم الحذف")
+                time.sleep(1)
+                st.rerun()
+
+        st.divider()
+        t_sec, t_job, t_cor = st.tabs(["📝 الثانوية العامة", "📋 امتحان التوظيف", "✍️ التصحيح"])
+        
+        # ==================== تبويب الثانوية العامة ====================
+        with t_sec:
+            if get_form_status('ثانوية'):
+                with st.form(key=f"sec_form_{st.session_state.reset_key}"):
+                    c1, c2 = st.columns(2)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "")
+                    name = c1.text_input("الاسم رباعي *", value="")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="")
+                    
+                    # ✅ مكان السكن - قائمة منسدلة
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0)
+                    
+                    job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
+                    job = c1.selectbox("الوظيفة *", job_list, index=0)
+                    
+                    # ✅ حقل الجنس - جديد
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0)
+                    
+                    st.divider()
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="")
+                    
+                    # ✅ التعديل 2: خيار القريب المباشر مع إظهار/إخفاء الحقل
+                    has_relative_sec = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_sec")
+                    if has_relative_sec == "يوجد":
+                        rel_name = st.text_input("اسم القريب المباشر", key="rel_name_sec")
+                    else:
+                        rel_name = ""
+                    
+                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True)
+                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True)
+                    
+                    if st.form_submit_button("💾 حفظ بيانات الثانوية"):
+                        if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        elif validate_inputs(id_num, phone):
+                            # ✅ التعديل 1: استخدام INSERT بدلاً من INSERT OR REPLACE للسماح بتسجيلات متعددة
+                            c.execute("INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", 
+                                    (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'], 
+                                     school2, phone, address, rel_name, job, desire, note, "الثانوية العامة", gender))
+                            conn.commit()
+                            st.success("✅ تم الحفظ")
+                            st.session_state.reset_key += 1
+                            time.sleep(1)
+                            st.rerun()
+
+        # ==================== تبويب امتحان التوظيف ====================
+        with t_job:
+            if get_form_status('توظيف'):
+                with st.form(key=f"job_form_{st.session_state.reset_key}"):
+                    c1, c2 = st.columns(2)
+                    id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key="job_id")
+                    name = c1.text_input("الاسم رباعي *", value="", key="job_name")
+                    phone = c1.text_input("رقم الجوال (10 أرقام) *", value="", key="job_phone")
+                    
+                    # ✅ مكان السكن - قائمة منسدلة
+                    address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key="job_addr")
+                    
+                    job_list = ["", "معلم", "مدير مدرسة", "سكرتير", "آذن"]
+                    job = c1.selectbox("الوظيفة *", job_list, index=0, key="job_title_sel")
+                    
+                    # ✅ حقل الجنس - جديد
+                    gender = c2.selectbox("الجنس *", GENDER_OPTIONS, index=0, key="job_gender")
+                    
+                    st.divider()
+                    school2 = st.text_input("المدرسة الثانية (إن وجدت)", value="", key="job_school2")
+                    
+                    # ✅ التعديل 2: خيار القريب المباشر مع إظهار/إخفاء الحقل
+                    has_relative_job = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_job")
+                    if has_relative_job == "يوجد":
+                        rel_exam = st.text_input("اسم القريب المباشر", key="rel_exam_job")
+                    else:
+                        rel_exam = ""
+                    
+                    desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key="d_job")
+                    note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key="n_job")
+                    
+                    if st.form_submit_button("💾 حفظ بيانات التوظيف"):
+                        if not (name and id_num and phone and address and job and gender): st.error("⚠️ يرجى تعبئة جميع الحقول الإجبارية")
+                        elif validate_inputs(id_num, phone):
+                            # ✅ التعديل 1: استخدام INSERT بدلاً من INSERT OR REPLACE
+                            c.execute("INSERT INTO main_table (id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                    (id_num, name, st.session_state['school_user'], st.session_state['school_display_name'],
+                                     school2, phone, address, rel_exam, job, desire, note, "امتحان التوظيف", gender))
+                            conn.commit()
+                            st.success("✅ تم الحفظ")
+                            st.session_state.reset_key += 1
+                            time.sleep(1)
+                            st.rerun()
+
+        # ==================== تبويب التصحيح ====================
+        with t_cor:
+            if get_form_status('تصحيح'):
+                with st.form(key=f"c_form_{st.session_state.reset_key}"):
+                    c1, c2 = st.columns(2)
+                    c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key="cor_id")
+                    c_name = c1.text_input("الاسم الرباعي *", value="", key="cor_name")
+                    c_phone = c1.text_input("الجوال (10 أرقام) *", value="", key="cor_phone")
+                    c_address = c2.selectbox("مكان السكن *", RESIDENCE_AREAS, index=0, key="cor_addr")
+                    branch_list = ["", "علمي", "أدبي", "تجاري", "صناعي", "فندقي", "زراعي", "اقتصاد منزلي"]
+                    c_branch = c1.selectbox("الفرع *", branch_list, index=0, key="cor_branch")
+                    sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص",  "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
+                    c_subj = c2.selectbox("المبحث *", sub_list, index=0, key="cor_subj")
+                    st.divider()
+                    
+                    # ✅ التعديل 2: خيار القريب المباشر في التصحيح مع إظهار/إخفاء الحقل
+                    has_rel = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key="rel_cor")
+                    if has_rel == "يوجد":
+                        rel_details = st.text_input("اسم القريب", key="rel_det_cor")
+                    else:
+                        rel_details = ""
+                    
+                    if st.form_submit_button("💾 حفظ بيانات التصحيح"):
+                        if not (c_name and c_id and c_phone and c_address and c_subj and c_branch): st.error("⚠️ يرجى اختيار المبحث والفرع وتعبئة الحقول")
+                        elif validate_inputs(c_id, c_phone):
+                            # ✅ التعديل 1: استخدام INSERT بدلاً من INSERT OR REPLACE
+                            c.execute("INSERT INTO correction_table (id_num, name, school_user, school_full_name, subject, branch, address, has_relative, relative_details, phone) VALUES (?,?,?,?,?,?,?,?,?,?)", (c_id, c_name, st.session_state['school_user'], st.session_state['school_display_name'], c_subj, c_branch, c_address, has_rel, rel_details, c_phone))
+                            conn.commit()
+                            st.success("✅ تم الحفظ")
+                            st.session_state.reset_key += 1
+                            time.sleep(1)
+                            st.rerun()
+
+    elif st.session_state.menu_choice == "التقارير":
+        st.subheader("📊 سجلات المدرسة الموثقة")
+        
+        # ✅ التعديل 4: إضافة فلتر لاختيار النظام المطلوب عرض تقريره
+        report_type = st.selectbox("اختر النظام لعرض التقرير:", ["الكل", "الثانوية العامة", "امتحان التوظيف", "التصحيح"], key="report_filter")
+        
+        if report_type in ["الكل", "الثانوية العامة", "امتحان التوظيف"]:
+            df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
+            if report_type == "الثانوية العامة":
+                df1 = df1[df1['type'] == "الثانوية العامة"]
+            elif report_type == "امتحان التوظيف":
+                df1 = df1[df1['type'] == "امتحان التوظيف"]
+            
+            if not df1.empty: 
+                st.info("🔹 كشف المراقبة والتوظيف")
+                st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
+        
+        if report_type in ["الكل", "التصحيح"]:
+            df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
+            if not df2.empty: 
+                if report_type != "الكل": st.divider()
+                st.success("🔹 كشف التصحيح")
+                st.dataframe(df2[['id_num','name','address','branch','subject']], use_container_width=True)
+
+# --- شاشة الإدارة ---
+elif st.session_state['user_type'] == "admin":
+    # أزرار التنقل العلوية للقسم
+    adm_nav1, adm_nav2, adm_nav3, adm_nav4 = st.columns([1, 1, 2, 1])
+    with adm_nav1:
+        if st.button("📂 إدارة البيانات", use_container_width=True):
+            st.session_state.menu_choice = "إدارة البيانات"
+    with adm_nav2:
+        if st.button("⚙️ صلاحيات النماذج", use_container_width=True):
+            st.session_state.menu_choice = "صلاحيات النماذج"
+    with adm_nav4:
+        if st.button("🚪 تسجيل الخروج", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+
+    st.title("🛠️ لوحة تحكم الإدارة المركزية")
+    
+    if st.session_state.menu_choice == "صلاحيات النماذج":
+        cols = st.columns(3)
+        for i, f in enumerate(['ثانوية', 'توظيف', 'تصحيح']):
+            with cols[i]:
+                curr = get_form_status(f)
+                st.write(f"نموذج {f}: {'✅ مفتوح' if curr else '❌ مغلق'}")
+                if st.button(f"تغيير حالة {f}", key=f"at_{f}"): 
+                    c.execute("UPDATE system_settings SET is_open=? WHERE form_name=?", (0 if curr else 1, f))
+                    conn.commit()
+                    st.rerun()
+    else:
+        t1, t2, t3 = st.tabs(["الثانوية العامة", "امتحان التوظيف", "التصحيح"])
+        
+        def view_admin(t_name, d_type, k_s, is_c=False):
+            df = pd.read_sql_query("SELECT * FROM correction_table", conn) if is_c else pd.read_sql_query("SELECT * FROM main_table WHERE type=?", conn, params=(d_type,))
+            
+            # ✅ التعديل 1: إضافة فلتر للمكررين (نفس id_num في مدارس مختلفة)
+            if not is_c and not df.empty:
+                dup_filter = st.checkbox(f"✅ عرض المكررين فقط ({t_name})", key=f"dup_{k_s}", help="عرض الأرقام المسجلة في أكثر من مدرسة")
+                if dup_filter:
+                    dup_ids = df.groupby('id_num').filter(lambda x: x['school_full_name'].nunique() > 1)['id_num'].unique()
+                    df = df[df['id_num'].isin(dup_ids)]
+            
+            sel = st.selectbox(f"اختر مدرسة ({t_name}):", ["الكل"] + sorted(df['school_full_name'].dropna().unique().tolist()) if not df.empty else ["الكل"], key=f"s_{k_s}")
+            f_df = df if sel == "الكل" else df[df['school_full_name'] == sel]
+            
+            # ✅ التعديل 1: إضافة واجهة للحذف اليدوي لسجل محدد
+            if not f_df.empty:
+                st.dataframe(f_df, use_container_width=True)
+                st.write("🗑️ **لحذف سجل محدد يدوياً:**")
+                col_del1, col_del2, col_del3 = st.columns([3, 3, 1])
+                with col_del1:
+                    del_id = st.text_input("رقم الهوية:", key=f"del_id_{k_s}")
+                with col_del2:
+                    del_school = st.selectbox("المدرسة:", ["الكل"] + list(f_df['school_full_name'].dropna().unique()), key=f"del_sch_{k_s}")
+                with col_del3:
+                    if st.button("حذف", key=f"btn_del_{k_s}"):
+                        if del_id:
+                            if del_school == "الكل":
+                                c.execute("DELETE FROM correction_table WHERE id_num=?" if is_c else "DELETE FROM main_table WHERE id_num=?", (del_id,))
+                            else:
+                                c.execute("DELETE FROM correction_table WHERE id_num=? AND school_full_name=?" if is_c else "DELETE FROM main_table WHERE id_num=? AND school_full_name=?", (del_id, del_school))
+                            conn.commit()
+                            st.success("✅ تم حذف السجل")
+                            time.sleep(1)
+                            st.rerun()
+            else:
+                st.info("لا توجد بيانات لعرضها")
+            
+            st.download_button(label=f"📥 تحميل ({t_name})", data=to_excel(f_df), file_name=f'admin_{k_s}.xlsx')
+        
+        with t1: view_admin("الثانوية العامة", "الثانوية العامة", "tw")
+        with t2: view_admin("امتحان التوظيف", "امتحان التوظيف", "em")
+        with t3: view_admin("تصحيح", "", "cr", True)
