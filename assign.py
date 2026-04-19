@@ -221,7 +221,7 @@ if st.session_state['user_type'] == "school":
                 rel_exam = ""
                 if has_rel == "يوجد":
                     # سيظهر هذا المستطيل فقط عند اختيار "يوجد" ويختفي عند "لا يوجد"
-                    rel_exam = st.text_input("الاسم الثلاثي للقريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
+                    rel_exam = st.text_input("الاسم الرباعي للقريب المباشر *", key=f"rel_exam_input_{st.session_state.reset_key}")
         
                 st.divider()
                 # استخدام زر عادي بدلاً من زر الفورم
