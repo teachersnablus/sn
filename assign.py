@@ -94,10 +94,10 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
     if cols_to_drop:
         df_excel = df_excel.drop(columns=cols_to_drop)
     
-    # إضافة عمود الترقيم
+    # إضافة الترقيم
     df_excel.insert(0, 'الرقم', range(1, len(df_excel) + 1))
     
-    # ترجمة أسماء الأعمدة
+    # ترجمة الأعمدة
     df_excel = df_excel.rename(columns={k: v for k, v in COLUMN_NAMES_MAP.items() if k in df_excel.columns})
     
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -105,7 +105,7 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
         
-        # ✅ تنسيقات الخلية
+        # ✅ تنسيقات
         cell_format = workbook.add_format({
             'font_size': 14, 'font_name': 'Arial', 'border': 1,
             'align': 'center', 'valign': 'vcenter', 'text_wrap': True
@@ -118,32 +118,34 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
             'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
         })
         
-        # ✅ اتجاه الورقة من اليمين لليسار
+        # ✅ اتجاه عربي
         worksheet.right_to_left()
         
-        # ✅ ضبط عرض الأعمدة تلقائياً
+        # ✅ ضبط عرض الأعمدة بشكل آمن
         for i, col in enumerate(df_excel.columns):
-            max_len = max(df_excel[col].astype(str).map(len).max(), len(str(col)) + 2)
-            worksheet.set_column(i, i, min(max_len * 1.3, 50), cell_format)
+            try:
+                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
+            except:
+                max_len = 15
+            worksheet.set_column(i, i, min(max_len * 1.4, 50), cell_format)
         
-        # ✅ تنسيق صف العناوين
+        # ✅ كتابة العناوين
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
-        
-        # ✅ تنسيق بيانات الجدول
+            
+        # ✅ كتابة البيانات
         for row_num, row in enumerate(df_excel.values, start=1):
             for col_num, value in enumerate(row):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
         
-        # ✅ إضافة توقيع المدير والخاتم أسفل الجدول
+        # ✅ توقيع وخاتم
         last_row = len(df_excel) + 3
-        worksheet.merge_range(f'A{last_row}:C{last_row}', 'توقيع مدير المدرسة: ........................', signature_format)
-        worksheet.merge_range(f'D{last_row}:F{last_row}', f'خاتم المدرسة: {school_name}', signature_format)
+        worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', signature_format)
+        worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', signature_format)
         
-        # ✅ إعدادات الطباعة: صفحة واحدة عرضاً
-        worksheet.set_print_area(0, 0, len(df_excel), len(df_excel.columns) - 1)
+        # ✅ إعدادات الطباعة (بديل آمن عن set_print_area)
         worksheet.fit_to_pages(1, 0)  # عرض في صفحة واحدة، الطول حر
-        worksheet.set_margins(left=0.5, right=0.5, top=0.7, bottom=0.7)
+        worksheet.set_margins(left=0.4, right=0.4, top=0.5, bottom=0.5)
         
     return output.getvalue()
 
