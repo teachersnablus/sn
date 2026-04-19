@@ -89,15 +89,10 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
     output = BytesIO()
     df_excel = df.copy()
     
-    # إزالة الأعمدة الداخلية
     cols_to_drop = [col for col in ['id', 'school_user', 'school_full_name'] if col in df_excel.columns]
-    if cols_to_drop:
-        df_excel = df_excel.drop(columns=cols_to_drop)
+    if cols_to_drop: df_excel = df_excel.drop(columns=cols_to_drop)
     
-    # إضافة الترقيم
     df_excel.insert(0, 'الرقم', range(1, len(df_excel) + 1))
-    
-    # ترجمة الأعمدة
     df_excel = df_excel.rename(columns={k: v for k, v in COLUMN_NAMES_MAP.items() if k in df_excel.columns})
     
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -105,47 +100,44 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
         
-        # ✅ زيادة حجم الخط إلى 16 للطباعة الواضحة
+        # ✅ حجم 14 هو الأمثل للطباعة العربية الواضحة مع الجداول العريضة
         cell_format = workbook.add_format({
-            'font_size': 16, 'font_name': 'Arial', 'border': 1,
+            'font_size': 14, 'font_name': 'Arial', 'border': 1,
             'align': 'center', 'valign': 'vcenter', 'text_wrap': True
         })
         header_format = workbook.add_format({
-            'font_size': 16, 'font_name': 'Arial', 'bold': True, 'border': 1,
+            'font_size': 14, 'font_name': 'Arial', 'bold': True, 'border': 1,
             'bg_color': '#D7E4BC', 'align': 'center', 'valign': 'vcenter'
         })
-        signature_format = workbook.add_format({
-            'font_size': 16, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
+        sig_format = workbook.add_format({
+            'font_size': 14, 'font_name': 'Arial', 'align': 'right', 'valign': 'top', 'border': 0
         })
         
-        # ✅ اتجاه عربي + إعدادات الطباعة الاحترافية
+        # ✅ إعدادات الطباعة المضمونة لصفحة واحدة
         worksheet.right_to_left()
-        worksheet.set_paper(9)          # حجم A4
-        worksheet.set_landscape()       # وضع أفقي (أفضل للجداول العريضة)
-        worksheet.set_print_scale(100)  # طباعة بالحجم الطبيعي 100% (بدون تصغير)
-        worksheet.set_default_row(height=35) # ارتفاع مناسب للصفوف للطباعة
-        worksheet.set_margins(left=0.5, right=0.5, top=0.7, bottom=0.7)
+        worksheet.set_landscape()               # وضع أفقي لاستيعاب العرض
+        worksheet.fit_to_pages(1, 0)            # ✅ هذا السطر الوحيد الذي يضمن احتواء كل الأعمدة في عرض صفحة واحدة
+        worksheet.set_margins(left=0.3, right=0.3, top=0.4, bottom=0.4) # هوامش ضيقة جداً لاستغلال المساحة
         
-        # ✅ ضبط عرض الأعمدة
+        # ✅ حساب عرض الأعمدة بشكل مضغوط ومنطقي
         for i, col in enumerate(df_excel.columns):
-            try:
-                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 2)
-            except:
-                max_len = 15
-            worksheet.set_column(i, i, min(max_len * 1.5, 60), cell_format)
+            try: 
+                max_len = max(df_excel[col].dropna().astype(str).str.len().max(), len(str(col)) + 1)
+            except: 
+                max_len = 12
+            worksheet.set_column(i, i, min(max_len * 1.1, 35), cell_format) # عرض محكم يمنع الهدر
         
-        # ✅ كتابة العناوين والبيانات
+        # ✅ الكتابة
         for col_num, value in enumerate(df_excel.columns.values):
             worksheet.write(0, col_num, value, header_format)
-            
         for row_num, row in enumerate(df_excel.values, start=1):
             for col_num, value in enumerate(row):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
         
-        # ✅ توقيع وخاتم
+        # ✅ التوقيع والخاتم
         last_row = len(df_excel) + 3
-        worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', signature_format)
-        worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', signature_format)
+        worksheet.merge_range(f'A{last_row}:D{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
+        worksheet.merge_range(f'E{last_row}:H{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
         
     return output.getvalue()
 
