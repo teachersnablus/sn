@@ -138,9 +138,9 @@ def to_excel_formatted(df, report_title="تقرير", school_name=""):
                 worksheet.write(row_num, col_num, str(value) if pd.notna(value) else "", cell_format)
                 
         # ✅ التوقيع والخاتم (باستخدام write لتجنب خطأ التداخل)
-        sig_row = len(df_excel) + 3
-        worksheet.write(f'A{sig_row}', 'توقيع مدير المدرسة: ........................', sig_format)
-        worksheet.write(f'G{sig_row}', f'خاتم المدرسة: {school_name}', sig_format)
+        last_row = len(df_excel) + 3
+        worksheet.merge_range(f'A{last_row}:F{last_row}', 'توقيع مدير المدرسة: ........................', sig_format)
+        worksheet.merge_range(f'G{last_row}:L{last_row}', f'خاتم المدرسة: {school_name}', sig_format)
         
     return output.getvalue()
 
