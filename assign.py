@@ -291,7 +291,7 @@ if st.session_state['user_type'] == "school":
             df1 = pd.read_sql_query("SELECT * FROM main_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
             if report_type == "الثانوية العامة": df1 = df1[df1['type'] == "الثانوية العامة"]
             elif report_type == "امتحان التوظيف": df1 = df1[df1['type'] == "امتحان التوظيف"]
-            if not df1.empty: st.info("🔹 كشف المراقبة والتوظيف"); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
+            if not df1.empty: st.info("🔹 كشف المراقبة "); st.dataframe(df1.drop(columns=['school_user','school_full_name']), use_container_width=True)
         
         if report_type in ["الكل", "التصحيح"]:
             df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
