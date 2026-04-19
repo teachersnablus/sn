@@ -319,7 +319,7 @@ if st.session_state['user_type'] == "school":
                 d1 = df1.drop(columns=['id', 'school_user', 'school_full_name']).copy()
                 d1.insert(0, 'الرقم', list(range(1, len(d1) + 1)))
                 d1 = d1.reset_index(drop=True)
-                st.dataframe(d1.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
+                st.dataframe(d1.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
         
         if report_type in ["الكل", "التصحيح"]:
             df2 = pd.read_sql_query("SELECT * FROM correction_table WHERE school_user=?", conn, params=(st.session_state['school_user'],))
@@ -330,7 +330,7 @@ if st.session_state['user_type'] == "school":
                 d2 = df2.drop(columns=['id', 'school_user', 'school_full_name']).copy()
                 d2.insert(0, 'الرقم', list(range(1, len(d2) + 1)))  # ✅ تحويل range إلى قائمة
                 d2 = d2.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
-                st.dataframe(d2.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
+                st.dataframe(d2.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
 
 # --- شاشة الإدارة ---
 elif st.session_state['user_type'] == "admin":
@@ -367,7 +367,7 @@ elif st.session_state['user_type'] == "admin":
                 admin_disp = f_df.drop(columns=['id']).copy()
                 admin_disp.insert(0, 'الرقم', list(range(1, len(admin_disp) + 1)))  # ✅ تحويل range إلى قائمة
                 admin_disp = admin_disp.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
-                st.dataframe(admin_disp.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
+                st.dataframe(admin_disp.rename(columns=COLUMN_NAMES_MAP), use_container_width=True, hide_index=True)
                 
                 st.write("🗑️ **لحذف سجل محدد يدوياً:**")
                 col_del1, col_del2, col_del3 = st.columns([3, 3, 1])
