@@ -317,7 +317,8 @@ if st.session_state['user_type'] == "school":
                 st.info("🔹 كشف المراقبة والتوظيف")
                 # تطبيق الترقيم المتسلسل
                 d1 = df1.drop(columns=['id', 'school_user', 'school_full_name']).copy()
-                d1.insert(0, 'الرقم', range(1, len(d1) + 1))
+                d1.insert(0, 'الرقم', list(range(1, len(d1) + 1)))
+                d1 = d1.reset_index(drop=True)
                 st.dataframe(d1.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
         
         if report_type in ["الكل", "التصحيح"]:
@@ -327,7 +328,8 @@ if st.session_state['user_type'] == "school":
                 st.success("🔹 كشف التصحيح")
                 # تطبيق الترقيم المتسلسل
                 d2 = df2.drop(columns=['id', 'school_user', 'school_full_name']).copy()
-                d2.insert(0, 'الرقم', range(1, len(d2) + 1))
+                d2.insert(0, 'الرقم', list(range(1, len(d2) + 1)))  # ✅ تحويل range إلى قائمة
+                d2 = d2.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
                 st.dataframe(d2.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
 
 # --- شاشة الإدارة ---
@@ -363,7 +365,8 @@ elif st.session_state['user_type'] == "admin":
             if not f_df.empty:
                 # تطبيق الترقيم المتسلسل في شاشة الإدارة
                 admin_disp = f_df.drop(columns=['id']).copy()
-                admin_disp.insert(0, 'الرقم', range(1, len(admin_disp) + 1))
+                admin_disp.insert(0, 'الرقم', list(range(1, len(admin_disp) + 1)))  # ✅ تحويل range إلى قائمة
+                admin_disp = admin_disp.reset_index(drop=True)  # ✅ إخفاء الفهرس القديم
                 st.dataframe(admin_disp.rename(columns=COLUMN_NAMES_MAP), use_container_width=True)
                 
                 st.write("🗑️ **لحذف سجل محدد يدوياً:**")
