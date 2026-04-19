@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 from io import BytesIO
 import time
+import xlsxwriter
 
 # قاموس ترجمة الأعمدة
 COLUMN_NAMES_MAP = {
