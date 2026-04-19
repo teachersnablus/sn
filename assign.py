@@ -47,38 +47,32 @@ RESIDENCE_AREAS = [
 ]
 GENDER_OPTIONS = ["", "ذكر", "أنثى"]
 
-# --- 2. قاعدة البيانات + كود ترحيل تلقائي لإصلاح القيد ---
+# --- 2. قاعدة البيانات + إصلاح تلقائي للهيكل ---
 conn = sqlite3.connect("exams_system_final_v31.db", check_same_thread=False)
 c = conn.cursor()
 
-def fix_db_schema():
-    """إصلاح تلقائي لإزالة قيد UNIQUE من id_num ونقل البيانات"""
-    try:
-        c.execute("PRAGMA table_info(main_table)")
-        if any(col[1] == 'id_num' and col[5] == 1 for col in c.fetchall()):
-            c.execute('''CREATE TABLE IF NOT EXISTS main_table_new (id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, desire TEXT, principal_note TEXT, type TEXT, gender TEXT)''')
-            c.execute('INSERT INTO main_table_new SELECT NULL, id_num, name, school_user, school_full_name, school2, phone, address, relative_exam, job_title, desire, principal_note, type, gender FROM main_table')
-            c.execute('DROP TABLE main_table')
-            c.execute('ALTER TABLE main_table_new RENAME TO main_table')
+def auto_fix_db_schema():
+    """فحص وإصلاح جداول قاعدة البيانات تلقائياً لتجنب أخطاء OperationalError"""
+    # إصلاح system_settings
+    c.execute("PRAGMA table_info(system_settings)")
+    if [col[1] for col in c.fetchall()] != ['form_name', 'is_open']:
+        c.execute("DROP TABLE IF EXISTS system_settings")
+        c.execute('''CREATE TABLE system_settings (form_name TEXT PRIMARY KEY, is_open INTEGER)''')
 
-        c.execute("PRAGMA table_info(correction_table)")
-        if any(col[1] == 'id_num' and col[5] == 1 for col in c.fetchall()):
-            c.execute('''CREATE TABLE IF NOT EXISTS correction_table_new (id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, subject TEXT, branch TEXT, address TEXT, has_relative TEXT, relative_details TEXT, phone TEXT)''')
-            c.execute('INSERT INTO correction_table_new SELECT NULL, id_num, name, school_user, school_full_name, subject, branch, address, has_relative, relative_details, phone FROM correction_table')
-            c.execute('DROP TABLE correction_table')
-            c.execute('ALTER TABLE correction_table_new RENAME TO correction_table')
-        conn.commit()
-    except: pass
+    # إصلاح main_table و correction_table (لإزالة قيد UNIQUE القديم من id_num)
+    for tbl, create_sql in [
+        ('main_table', 'id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, desire TEXT, principal_note TEXT, type TEXT, gender TEXT'),
+        ('correction_table', 'id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, subject TEXT, branch TEXT, address TEXT, has_relative TEXT, relative_details TEXT, phone TEXT')
+    ]:
+        c.execute(f"PRAGMA table_info({tbl})")
+        existing = [col[1] for col in c.fetchall()]
+        expected = [part.split()[0] for part in create_sql.split(', ')]
+        if existing != expected:
+            c.execute(f"DROP TABLE IF EXISTS {tbl}")
+        c.execute(f"CREATE TABLE IF NOT EXISTS {tbl} ({create_sql})")
 
-fix_db_schema()
+auto_fix_db_schema()
 
-c.execute('''CREATE TABLE IF NOT EXISTS main_table 
-             (id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, school2 TEXT, 
-              phone TEXT, address TEXT, relative_exam TEXT, job_title TEXT, desire TEXT, principal_note TEXT, type TEXT, gender TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS correction_table 
-             (id INTEGER PRIMARY KEY AUTOINCREMENT, id_num TEXT, name TEXT, school_user TEXT, school_full_name TEXT, 
-              subject TEXT, branch TEXT, address TEXT, has_relative TEXT, relative_details TEXT, phone TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS system_settings (form_name TEXT PRIMARY KEY, is_open INTEGER)''')
 for form in ['ثانوية', 'توظيف', 'تصحيح']:
     c.execute("INSERT OR IGNORE INTO system_settings VALUES (?, 1)", (form,))
 conn.commit()
@@ -141,7 +135,6 @@ if not st.session_state['auth']:
             adm_pass = st.text_input("كلمة مرور القسم", type="password", key="admin_pass_input")
             if st.form_submit_button("دخول القسم"):
                 if adm_pass == "ADMIN2026":
-                    # ✅ إصلاح 1: إغلاق علامة التنصيص بشكل صحيح
                     st.session_state.update({'auth': True, 'user_type': "admin", 'menu_choice': "إدارة البيانات"})
                     st.rerun()
                 else: st.error("❌ كلمة المرور غير صحيحة")
@@ -186,7 +179,6 @@ if st.session_state['user_type'] == "school":
         with t_sec:
             if get_form_status('ثانوية'):
                 with st.form(key=f"sec_form_{st.session_state.reset_key}"):
-                    # ✅ الملاحظة فوق رقم الهوية
                     st.markdown('<div class="note-box">📋 ملاحظة هامة: تعبأ بيانات المعلم الذي ليس له قريب مباشر فقط</div>', unsafe_allow_html=True)
                     
                     c1, c2 = st.columns(2)
@@ -213,7 +205,6 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
-                # ✅ إصلاح 2: زر القريب خارج الفورم ليظهر المستطيل فوراً
                 st.session_state.has_rel_job = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_job_{st.session_state.reset_key}", index=0 if st.session_state.has_rel_job == "لا يوجد" else 1)
                 if st.session_state.has_rel_job == "يوجد":
                     rel_exam = st.text_input("اسم القريب المباشر *", value="", key=f"rel_exam_job_{st.session_state.reset_key}")
@@ -245,7 +236,6 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب التصحيح ====================
         with t_cor:
             if get_form_status('تصحيح'):
-                # ✅ زر القريب خارج الفورم ليظهر المستطيل فوراً
                 st.session_state.has_rel_cor = st.radio("هل له قريب مباشر يتقدم للامتحان؟", ["لا يوجد", "يوجد"], horizontal=True, key=f"rel_cor_{st.session_state.reset_key}", index=0 if st.session_state.has_rel_cor == "لا يوجد" else 1)
                 if st.session_state.has_rel_cor == "يوجد":
                     rel_details = st.text_input("اسم القريب *", value="", key=f"rel_det_cor_{st.session_state.reset_key}")
