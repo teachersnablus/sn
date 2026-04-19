@@ -206,7 +206,8 @@ if not st.session_state['auth']:
             
             if admin_submitted:
                 if adm_pass == "ADMIN2026":
-                    st.session_state.update({'auth': True, 'user_type': "admin', 'menu_choice': "إدارة البيانات"})
+                    # ✅ إصلاح 1: إغلاق علامة التنصيص بشكل صحيح
+                    st.session_state.update({'auth': True, 'user_type': "admin", 'menu_choice': "إدارة البيانات"})
                     st.rerun()
                 else: st.error("❌ كلمة المرور غير صحيحة")
     st.stop()
@@ -304,6 +305,15 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب امتحان التوظيف ====================
         with t_job:
             if get_form_status('توظيف'):
+                # ✅ إصلاح 2: نقل خيار القريب خارج الـ form ليظهر الحقل فوراً
+                st.session_state.has_rel_job = st.radio(
+                    "هل له قريب مباشر يتقدم للامتحان؟", 
+                    ["لا يوجد", "يوجد"], 
+                    horizontal=True, 
+                    key=f"rel_job_{st.session_state.reset_key}",
+                    index=0 if st.session_state.has_rel_job == "لا يوجد" else 1
+                )
+                
                 with st.form(key=f"job_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     id_num = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"job_id_{st.session_state.reset_key}")
@@ -320,16 +330,7 @@ if st.session_state['user_type'] == "school":
                     desire = st.radio("الرغبة:", ["يرغب", "لا يرغب"], horizontal=True, key=f"d_job_{st.session_state.reset_key}")
                     note = st.radio("رأي المدير:", ["يصلح", "لا يصلح"], horizontal=True, key=f"n_job_{st.session_state.reset_key}")
                     
-                    # ✅ خيار القريب المباشر يظهر بعد الرغبة ورأي المدير
-                    st.session_state.has_rel_job = st.radio(
-                        "هل له قريب مباشر يتقدم للامتحان؟", 
-                        ["لا يوجد", "يوجد"], 
-                        horizontal=True, 
-                        key=f"rel_job_{st.session_state.reset_key}",
-                        index=0 if st.session_state.has_rel_job == "لا يوجد" else 1
-                    )
-                    
-                    # ✅ إظهار حقل القريب بناءً على قيمة الجلسة
+                    # ✅ إظهار حقل القريب بناءً على قيمة الجلسة (يظهر فوراً لأن الشرط خارج الـ form)
                     if st.session_state.has_rel_job == "يوجد":
                         rel_exam = st.text_input("اسم القريب المباشر *", value="", key=f"rel_exam_job_{st.session_state.reset_key}")
                     else:
@@ -361,6 +362,15 @@ if st.session_state['user_type'] == "school":
         # ==================== تبويب التصحيح ====================
         with t_cor:
             if get_form_status('تصحيح'):
+                # ✅ خيار القريب خارج الـ form ليظهر الحقل فوراً
+                st.session_state.has_rel_cor = st.radio(
+                    "هل له قريب مباشر يتقدم للامتحان؟", 
+                    ["لا يوجد", "يوجد"], 
+                    horizontal=True, 
+                    key=f"rel_cor_{st.session_state.reset_key}",
+                    index=0 if st.session_state.has_rel_cor == "لا يوجد" else 1
+                )
+                
                 with st.form(key=f"c_form_{st.session_state.reset_key}"):
                     c1, c2 = st.columns(2)
                     c_id = c2.text_input("رقم الهوية (9 أرقام) *", value=search_id if search_id else "", key=f"cor_id_{st.session_state.reset_key}")
@@ -372,15 +382,6 @@ if st.session_state['user_type'] == "school":
                     sub_list = ["", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "التربية الإسلامية", "الفيزياء", "الكيمياء", "الأحياء", "تكنولوجيا المعلومات", "التاريخ", "الجغرافيا","الثقافة العلمية", "فرع (الريادة و الأعمال) - مباحث التخصص", "فرع (الاقتصاد المنزلي) - مباحث التخصص",  "الفروع المهنية (الصناعي ) - مباحث التخصص", "الفروع المهنية (الزراعي) - مباحث التخصص"]
                     c_subj = c2.selectbox("المبحث *", sub_list, index=0, key=f"cor_subj_{st.session_state.reset_key}")
                     st.divider()
-                    
-                    # ✅ إعادة زر القريب المباشر في التصحيح (كان محذوف بالخطأ)
-                    st.session_state.has_rel_cor = st.radio(
-                        "هل له قريب مباشر يتقدم للامتحان؟", 
-                        ["لا يوجد", "يوجد"], 
-                        horizontal=True, 
-                        key=f"rel_cor_{st.session_state.reset_key}",
-                        index=0 if st.session_state.has_rel_cor == "لا يوجد" else 1
-                    )
                     
                     # ✅ إظهار حقل القريب في التصحيح بناءً على قيمة الجلسة
                     if st.session_state.has_rel_cor == "يوجد":
