@@ -201,7 +201,7 @@ if st.session_state['user_type'] == "school":
     with nav4:
         if st.button("🚪 تسجيل الخروج", use_container_width=True): st.session_state.clear(); st.rerun()
 
-    st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_name['school_display_name']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='school-title'>🏢 مدرسة: {st.session_state['school_display_name']}</div>", unsafe_allow_html=True)
 
     if st.session_state.menu_choice == "إضافة":
         col_lbl, col_inp = st.columns([1.2, 3])
