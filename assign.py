@@ -143,7 +143,7 @@ if st.session_state['user_type'] == "school":
     if st.session_state.menu_choice == "إضافة":
         col_lbl, col_inp = st.columns([1.2, 3])
         with col_lbl: st.markdown("<div class='search-row-label'>🔍 بحث برقم الهوية</div>", unsafe_allow_html=True)
-        with col_inp: search_id = st.text_input("", placeholder="9 أرقام...", key=f"search_input", label_visibility="collapsed").strip()
+        with col_inp: search_id = st.text_input("", placeholder="9 أرقام...", key=f"search_field_{st.session_state.reset_key}", label_visibility="collapsed").strip()
         
         found_data = {"main_sec": None, "main_job": None, "cor": None}
         if len(search_id) == 9:
